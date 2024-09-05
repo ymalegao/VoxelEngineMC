@@ -11,12 +11,7 @@ using namespace std;
 #include <functional>   // For std::hash
 
 // Custom hash function for std::pair<int, int>
-struct pair_hash {
-    template <class T1, class T2>
-    std::size_t operator() (const std::pair<T1, T2>& pair) const {
-        return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
-    }
-};
+
 
 
 #define CHUNK_SIZE 16
@@ -28,7 +23,6 @@ float lastX = 0.0f;
 float lastY = 0.0f;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
-std::unordered_map<std::pair<int, int>, Chunk*, pair_hash> loadedChunks;
 
 
 
@@ -106,6 +100,8 @@ void Game::Init() {
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_CULL_FACE);
+
     glfwSetWindowUserPointer(window, this);
     // glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetCursorPosCallback(window, mouse_button_callback);
@@ -116,7 +112,7 @@ void Game::Init() {
     float lastX = framebufferWidth / 2.0f;
     float lastY = framebufferHeight / 2.0f;
 
-    chunk = new Chunk(16,16,16, glm::vec3(0.0f, 0.0f, 0.0f));
+    chunk = new Chunk(16,16,16, glm::vec3(0.0f, 0.0f, 0.0f) , this); ;
     camera = new Camera();
     
    
@@ -152,7 +148,7 @@ void Game::UpdateChunks() {
             std::pair<int, int> chunkPos = {x, z};
 
             if (loadedChunks.find(chunkPos) == loadedChunks.end()) {
-                loadedChunks[chunkPos] = new Chunk(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE, glm::vec3(x * CHUNK_SIZE, 0.0f, z * CHUNK_SIZE));
+                loadedChunks[chunkPos] = new Chunk(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE, glm::vec3(x * CHUNK_SIZE, 0.0f, z * CHUNK_SIZE) , this);
             }
         }
     }
@@ -176,7 +172,8 @@ void Game::Render() {
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // Add this line
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+    //set color to sky blue
+    glClearColor(0.53f, 0.81f, 0.98f, 1.0f);
     
     //change the view matrix to the camera view matrix
 

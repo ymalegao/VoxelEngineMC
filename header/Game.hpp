@@ -3,13 +3,29 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <vector>
+#include "Chunk.hpp"
+#include <utility>      // For std::pair
+#include <functional>   // For std::hash
+class Chunk;
+
+
+struct pair_hash {
+    template <class T1, class T2>
+    std::size_t operator() (const std::pair<T1, T2>& pair) const {
+        return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
+    }
+};
+
 
 class Game {
+
 public:
     Game(int width, int height);
     ~Game();
 
     void Run();
+    std::unordered_map<std::pair<int, int>, Chunk*, pair_hash> loadedChunks;
+
 
 private:
     int width, height;

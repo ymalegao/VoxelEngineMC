@@ -7,8 +7,8 @@
 #include "PerlinNoise.hpp"
 using namespace std;
 
-Chunk::Chunk(int sizeX, int sizeY, int sizeZ, glm::vec3 position) :
-    sizeX(sizeX), sizeY(sizeY), sizeZ(sizeZ), position(position) {
+Chunk::Chunk(int sizeX, int sizeY, int sizeZ, glm::vec3 position , Game *gameRef) :
+    sizeX(sizeX), sizeY(sizeY), sizeZ(sizeZ), position(position), gameRef(gameRef) {
     // Load shaders
     // this->sizeX = sizeX;
     // this->sizeY = sizeY;
@@ -87,47 +87,216 @@ void Chunk::generateChunk(){
             int worldX = static_cast<int>(position.x) + x;
             int worldZ = static_cast<int>(position.z) + z;
             
-            float noiseValue = perlinNoise.noise2D_01(worldX * 0.15f, worldZ * 0.1f); // Adjust the scale for noise as needed
+            float noiseValue = perlinNoise.octave2D_01(worldX * 0.02f, worldZ * 0.02f, 4, 0.5f);
 
             int height = static_cast<int>(noiseValue * sizeY);
 
             for (int y = 0; y < height; y++){
                 glm::vec3 pos = glm::vec3(x, y, z);
-                float voxelVertices[] = {
-                    pos.x - 0.5f, pos.y - 0.5f, pos.z - 0.5f,
-                    pos.x + 0.5f, pos.y - 0.5f, pos.z - 0.5f,
-                    pos.x + 0.5f, pos.y + 0.5f, pos.z - 0.5f,
-                    pos.x - 0.5f, pos.y + 0.5f, pos.z - 0.5f,
-                    pos.x - 0.5f, pos.y - 0.5f, pos.z + 0.5f,
-                    pos.x + 0.5f, pos.y - 0.5f, pos.z + 0.5f,
-                    pos.x + 0.5f, pos.y + 0.5f, pos.z + 0.5f,
-                    pos.x - 0.5f, pos.y + 0.5f, pos.z + 0.5f
-                };
-
-                unsigned int voxelIndices[] = {
-                    0, 1, 2, 2, 3, 0,
-                    4, 5, 6, 6, 7, 4,
-                    0, 1, 5, 5, 4, 0,
-                    2, 3, 7, 7, 6, 2,
-                    0, 3, 7, 7, 4, 0,
-                    1, 2, 6, 6, 5, 1
-                };
-
-                vertices.insert(vertices.end(), std::begin(voxelVertices), std::end(voxelVertices));
-
-                unsigned int offset = vertices.size() / 3 - 8; // this math is becasue you have 24 vertices in the cube and then 24/3 = 8 - 8 is the index of the first vertex of the cube
-                for (auto i : voxelIndices) {
-                    indices.push_back(i + offset);
+                if (y == height - 1 || !isVoxelSolid(x, y + 1, z)) {  // Top face
+                    addFace(pos, Face::top);
                 }
+                if (y == 0 || !isVoxelSolid(x, y - 1, z)) {  // Bottom face
+                    addFace(pos, Face::bottom);
+                }
+                if (x == sizeX - 1 || !isVoxelSolid(x + 1, y, z)) {  // Right face
+                    addFace(pos, Face::right);
+                }
+                if (x == 0 || !isVoxelSolid(x - 1, y, z)) {  // Left face
+                    addFace(pos, Face::left);
+                }
+                if (z == sizeZ - 1 || !isVoxelSolid(x, y, z + 1)) {  // Front face
+                    addFace(pos, Face::front);
+                }
+                if (z == 0 || !isVoxelSolid(x, y, z - 1)) {  // Back face
+                    addFace(pos, Face::back);
+                }
+                    
             }
         }
-                    
     }
-    cout << "Generated chunk" << endl;
-    cout << "Vertices size: " << vertices.size() << endl;
-    cout << "Indices size: " << indices.size() << endl;
+}
+
+
+void Chunk::addFace(const glm::vec3&pos , Face face){
+    float voxelVerts[12]; // 4 vertices * 3 coordinates
+    unsigned int voxelIndices[6] = {0, 1, 2, 2, 3, 0}; // 2 triangles for each face
+
+    switch (face){
+        case Face::top:
+            voxelVerts[0] = pos.x - 0.5f; voxelVerts[1] = pos.y + 0.5f; voxelVerts[2] = pos.z - 0.5f;
+            voxelVerts[3] = pos.x + 0.5f; voxelVerts[4] = pos.y + 0.5f; voxelVerts[5] = pos.z - 0.5f;
+            voxelVerts[6] = pos.x + 0.5f; voxelVerts[7] = pos.y + 0.5f; voxelVerts[8] = pos.z + 0.5f;
+            voxelVerts[9] = pos.x - 0.5f; voxelVerts[10] = pos.y + 0.5f; voxelVerts[11] = pos.z + 0.5f;
+            break;
+        case Face::bottom:
+            voxelVerts[0] = pos.x - 0.5f; voxelVerts[1] = pos.y - 0.5f; voxelVerts[2] = pos.z - 0.5f;
+            voxelVerts[3] = pos.x + 0.5f; voxelVerts[4] = pos.y - 0.5f; voxelVerts[5] = pos.z - 0.5f;
+            voxelVerts[6] = pos.x + 0.5f; voxelVerts[7] = pos.y - 0.5f; voxelVerts[8] = pos.z + 0.5f;
+            voxelVerts[9] = pos.x - 0.5f; voxelVerts[10] = pos.y - 0.5f; voxelVerts[11] = pos.z + 0.5f;
+            break;
+        case Face::right:
+            voxelVerts[0] = pos.x + 0.5f; voxelVerts[1] = pos.y - 0.5f; voxelVerts[2] = pos.z - 0.5f;
+            voxelVerts[3] = pos.x + 0.5f; voxelVerts[4] = pos.y + 0.5f; voxelVerts[5] = pos.z - 0.5f;
+            voxelVerts[6] = pos.x + 0.5f; voxelVerts[7] = pos.y + 0.5f; voxelVerts[8] = pos.z + 0.5f;
+            voxelVerts[9] = pos.x + 0.5f; voxelVerts[10] = pos.y - 0.5f; voxelVerts[11] = pos.z + 0.5f;
+            break;
+        case Face::left:
+            voxelVerts[0] = pos.x - 0.5f; voxelVerts[1] = pos.y - 0.5f; voxelVerts[2] = pos.z - 0.5f;
+            voxelVerts[3] = pos.x - 0.5f; voxelVerts[4] = pos.y + 0.5f; voxelVerts[5] = pos.z - 0.5f;
+            voxelVerts[6] = pos.x - 0.5f; voxelVerts[7] = pos.y + 0.5f; voxelVerts[8] = pos.z + 0.5f;
+            voxelVerts[9] = pos.x - 0.5f; voxelVerts[10] = pos.y - 0.5f; voxelVerts[11] = pos.z + 0.5f;
+            break;
+        case Face::front:
+            voxelVerts[0] = pos.x - 0.5f; voxelVerts[1] = pos.y - 0.5f; voxelVerts[2] = pos.z + 0.5f;
+            voxelVerts[3] = pos.x + 0.5f; voxelVerts[4] = pos.y - 0.5f; voxelVerts[5] = pos.z + 0.5f;
+            voxelVerts[6] = pos.x + 0.5f; voxelVerts[7] = pos.y + 0.5f; voxelVerts[8] = pos.z + 0.5f;
+            voxelVerts[9] = pos.x - 0.5f; voxelVerts[10] = pos.y + 0.5f; voxelVerts[11] = pos.z + 0.5f;
+            break;
+        case Face::back:
+            voxelVerts[0] = pos.x - 0.5f; voxelVerts[1] = pos.y - 0.5f; voxelVerts[2] = pos.z - 0.5f;
+            voxelVerts[3] = pos.x + 0.5f; voxelVerts[4] = pos.y - 0.5f; voxelVerts[5] = pos.z - 0.5f;
+            voxelVerts[6] = pos.x + 0.5f; voxelVerts[7] = pos.y + 0.5f; voxelVerts[8] = pos.z - 0.5f;
+            voxelVerts[9] = pos.x - 0.5f; voxelVerts[10] = pos.y + 0.5f; voxelVerts[11] = pos.z - 0.5f;
+            break;
+
+    }
+
+    vertices.insert(vertices.end(), std::begin(voxelVerts), std::end(voxelVerts));
+    unsigned int offset = vertices.size() / 3 - 4;
+    for (auto index : voxelIndices){
+        indices.push_back(index + offset);
+    }
 
 }
+
+bool Chunk::isVoxelSolid(int x, int y, int z){
+    if (x >= 0 && x < sizeX && y >= 0 && y < sizeY && z >= 0 && z < sizeZ) {
+        // Generate the height for this (x, z) position using Perlin noise
+        int worldX = static_cast<int>(position.x) + x;
+        int worldZ = static_cast<int>(position.z) + z;
+
+        // Generate height using noise (adjust the scale and parameters as needed)
+        siv::PerlinNoise perlinNoise(1234);  // Seed for consistency across chunks
+        float noiseValue = perlinNoise.octave2D_01(worldX * 0.02f, worldZ * 0.02f, 4, 0.5f);
+        int height = static_cast<int>(noiseValue * sizeY);
+
+        // Check if the y position is below or at the generated height
+        return y <= height;
+    }
+
+    if (x == -1) {
+        Chunk* leftNeighbor = getLeftNeighbor();
+        if (leftNeighbor != nullptr) {
+            return leftNeighbor->isVoxelSolid(sizeX - 1, y, z);
+        }
+    } else if (x == sizeX) {
+        Chunk* rightNeighbor = getRightNeighbor();
+        if (rightNeighbor != nullptr) {
+            return rightNeighbor->isVoxelSolid(0, y, z);
+        }
+    }
+
+    if (y == -1) {
+        Chunk* bottomNeighbor = getBottomNeighbor();
+        if (bottomNeighbor != nullptr) {
+            return bottomNeighbor->isVoxelSolid(x, sizeY - 1, z);
+        }
+    } else if (y == sizeY) {
+        Chunk* topNeighbor = getTopNeighbor();
+        if (topNeighbor != nullptr) {
+            return topNeighbor->isVoxelSolid(x, 0, z);
+        }
+    }
+
+    if (z == -1) {
+        Chunk* backNeighbor = getBackNeighbor();
+        if (backNeighbor != nullptr) {
+            return backNeighbor->isVoxelSolid(x, y, sizeZ - 1);
+        }
+    } else if (z == sizeZ) {
+        Chunk* frontNeighbor = getFrontNeighbor();
+        if (frontNeighbor != nullptr) {
+            return frontNeighbor->isVoxelSolid(x, y, 0);
+        }
+    }
+
+    // If no neighboring chunk exists, assume non-solid (empty space)
+    return false;
+}
+
+Chunk* Chunk::getLeftNeighbor() {
+    int neighborChunkX = position.x - 1;
+    int neighborChunkZ = position.z;
+    std::pair<int, int> neighborPos = {neighborChunkX, neighborChunkZ};
+    auto it = gameRef->loadedChunks.find(neighborPos); // Access the chunk map from the game
+
+    if (it != gameRef->loadedChunks.end()) {
+        return it->second; // Return the chunk pointer if found
+    }
+    return nullptr; // Return nullptr if the neighbor isn't loaded
+}
+
+Chunk* Chunk::getRightNeighbor() {
+    int neighborChunkX = position.x + 1;
+    int neighborChunkZ = position.z;
+    std::pair<int, int> neighborPos = {neighborChunkX, neighborChunkZ};
+    auto it = gameRef->loadedChunks.find(neighborPos);
+
+    if (it != gameRef->loadedChunks.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
+Chunk* Chunk::getFrontNeighbor() {
+    int neighborChunkX = position.x;
+    int neighborChunkZ = position.z + 1;
+    std::pair<int, int> neighborPos = {neighborChunkX, neighborChunkZ};
+    auto it = gameRef->loadedChunks.find(neighborPos);
+
+    if (it != gameRef->loadedChunks.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
+Chunk* Chunk::getBackNeighbor() {
+    int neighborChunkX = position.x;
+    int neighborChunkZ = position.z - 1;
+    std::pair<int, int> neighborPos = {neighborChunkX, neighborChunkZ};
+    auto it = gameRef->loadedChunks.find(neighborPos);
+
+    if (it != gameRef->loadedChunks.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
+Chunk* Chunk::getTopNeighbor() {
+    int neighborChunkX = position.x;
+    int neighborChunkZ = position.z;
+    std::pair<int, int> neighborPos = {neighborChunkX, neighborChunkZ};
+    auto it = gameRef->loadedChunks.find(neighborPos);
+
+    if (it != gameRef->loadedChunks.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
+Chunk* Chunk::getBottomNeighbor() {
+    int neighborChunkX = position.x;
+    int neighborChunkZ = position.z;
+    std::pair<int, int> neighborPos = {neighborChunkX, neighborChunkZ};
+    auto it = gameRef->loadedChunks.find(neighborPos);
+
+    if (it != gameRef->loadedChunks.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
 
 void Chunk::setupMesh(){
     glGenVertexArrays(1, &VAO);

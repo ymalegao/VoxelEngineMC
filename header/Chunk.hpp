@@ -5,14 +5,29 @@
 #include <glm/glm.hpp>
 #include <string>
 #include <vector>
+#include "Game.hpp"
+
+class Game;
+
+enum Face {
+    front,
+    back,
+    left,
+    right,
+    top,
+    bottom
+};
+
 
 class Chunk {
 public:
-    Chunk(int sizeX, int sizeY, int sizeZ, glm::vec3 position);
+    Chunk(int sizeX, int sizeY, int sizeZ, glm::vec3 position, Game *gameRef);
     ~Chunk();
     void render(const glm::mat4& view, const glm::mat4& projection);
     void generateChunk();
     int sizeX, sizeY, sizeZ;
+    glm::vec3 position;
+    Game *gameRef;
 
 private:
     unsigned int VAO, VBO, EBO;
@@ -21,7 +36,14 @@ private:
     std::vector<float> vertices;
     std::vector<unsigned int> indices;
     void setupMesh();
-    glm::vec3 position;
+    void addFace(const glm::vec3& pos, Face face);
+    bool isVoxelSolid(int x, int y, int z);
+    Chunk* getLeftNeighbor();
+    Chunk* getRightNeighbor();
+    Chunk* getFrontNeighbor();
+    Chunk* getBackNeighbor();
+    Chunk* getTopNeighbor();
+    Chunk* getBottomNeighbor();
     
 
 };
