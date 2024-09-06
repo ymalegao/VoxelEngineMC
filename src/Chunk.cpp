@@ -370,7 +370,7 @@ void Chunk::setupMesh(){
 }
 
 
-void Chunk::render(const glm::mat4& view, const glm::mat4& projection) {
+void Chunk::render(GLuint shaderProgram, const glm::mat4& view, const glm::mat4& projection) {
     glUseProgram(shaderProgram);
 
     glm::mat4 model = glm::translate(glm::mat4(1.0f), position);
@@ -385,6 +385,8 @@ void Chunk::render(const glm::mat4& view, const glm::mat4& projection) {
 
     int projLoc = glGetUniformLocation(shaderProgram, "projection");
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+
+    
 
 
 

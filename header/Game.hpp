@@ -6,6 +6,7 @@
 #include "Chunk.hpp"
 #include <utility>      // For std::pair
 #include <functional>   // For std::hash
+#include "ShaderLoader.hpp"
 class Chunk;
 
 
@@ -22,6 +23,8 @@ class Game {
 public:
     Game(int width, int height);
     ~Game();
+    GLuint shaderProgram; 
+    ShaderLoader* shaderLoader;
 
     void Run();
     std::unordered_map<std::pair<int, int>, Chunk*, pair_hash> loadedChunks;

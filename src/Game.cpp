@@ -18,6 +18,7 @@ using namespace std;
 
 Chunk *chunk;
 Camera *camera;
+ShaderLoader *shaderLoader;
 bool firstMouse = true;
 float lastX = 0.0f;
 float lastY = 0.0f;
@@ -122,7 +123,7 @@ void Game::Init() {
 
     // chunk = new Chunk(16,16,16, glm::vec3(0.0f, 0.0f, 0.0f) , this); ;
     camera = new Camera();
-    
+    shaderProgram = shaderLoader->loadShaders("VertShader.vertexshader", "FragShader.fragmentshader");    
    
 }
 
@@ -177,11 +178,28 @@ void Game::UpdateChunks() {
 }
 
 void Game::Render() {
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // Add this line
+    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // Add this line
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     //set color to sky blue
-    glClearColor(0.53f, 0.81f, 0.98f, 1.0f);
+    glm::vec3 lightDir = glm::normalize(glm::vec3(-0.2f, -1.0f, -0.3f));  // Direction of light
+    glm::vec3 lightColor = glm::vec3(1.0f, -1.0f, 1.0f);  // White light
+    glm::vec3 ambientColor = glm::vec3(0.53f, 0.81f, 0.98f);  // Light sky blue as ambient
+    glm::vec3 objectColor = glm::vec3(0.7f, 0.3f, 0.3f);  // Example color for voxels (reddish)
+
+    // Pass the light information to the shader
+    GLuint lightDirLoc = glGetUniformLocation(shaderProgram, "lightDir");
+    GLuint lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
+    GLuint ambientColorLoc = glGetUniformLocation(shaderProgram, "ambientColor");
+    GLuint objectColorLoc = glGetUniformLocation(shaderProgram, "objectColor");
+
+    glUniform3fv(lightDirLoc, 1, glm::value_ptr(lightDir));
+    glUniform3fv(lightColorLoc, 1, glm::value_ptr(lightColor));
+    glUniform3fv(ambientColorLoc, 1, glm::value_ptr(ambientColor));
+    glUniform3fv(objectColorLoc, 1, glm::value_ptr(objectColor));
+
+
+    
     
     //change the view matrix to the camera view matrix
 
@@ -195,7 +213,7 @@ void Game::Render() {
     // chunk->render(view, projection);
     for (const auto& chunkPair : loadedChunks) {
         // cout << "Rendering chunk at " << chunkPair.first.first << " " << chunkPair.first.second << endl;
-        chunkPair.second->render(view, projection);
+        chunkPair.second->render(shaderProgram, view, projection);
     }
 
 

@@ -25,7 +25,7 @@ class Chunk {
 public:
     Chunk(int sizeX, int sizeY, int sizeZ, glm::vec3 position, Game *gameRef);
     ~Chunk();
-    void render(const glm::mat4& view, const glm::mat4& projection);
+    void render(GLuint shaderProgram, const glm::mat4& view, const glm::mat4& projection);
     void generateChunk();
     int sizeX, sizeY, sizeZ;
     glm::vec3 position;

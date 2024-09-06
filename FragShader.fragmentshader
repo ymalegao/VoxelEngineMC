@@ -1,8 +1,26 @@
 #version 330 core
-in vec3 ourColor; // Color coming from the vertex shader
 
 out vec4 FragColor;
 
+in vec3 FragPos;  // From vertex shader
+in vec3 Normal;   // From vertex shader
+
+// Lighting parameters
+uniform vec3 lightDir;  // Direction of the light
+uniform vec3 lightColor;  // Light color
+uniform vec3 ambientColor;  // Ambient light color
+uniform vec3 objectColor;  // Color of the voxel
+
 void main() {
-    FragColor = vec4(ourColor, 1.0); // Use interpolated color
+    // Ambient lighting
+    vec3 ambient = 0.1 * ambientColor;
+
+    // Directional lighting
+    vec3 norm = normalize(Normal);
+    float diff = max(dot(norm, -lightDir), 0.0);
+    vec3 diffuse = diff * lightColor;
+
+    // Final color
+    vec3 result = (ambient + diffuse) * objectColor;
+    FragColor = vec4(result, 1.0);
 }
