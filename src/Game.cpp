@@ -66,7 +66,14 @@ Game::Game(int width, int height)
 }
 
 Game::~Game() {
-    glfwTerminate();
+    for (auto& chunkPair : loadedChunks) {
+        if (chunkPair.second != nullptr) { // Check if the chunk pointer is valid
+            delete chunkPair.second; // Delete each chunk
+            chunkPair.second = nullptr; // Avoid dangling pointer
+        }
+    }
+    loadedChunks.clear(); // Clear the map after deletion
+    glfwTerminate();       // Terminate GLFW
 }
 
 void Game::Init() {
@@ -101,6 +108,7 @@ void Game::Init() {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST);
 
     glfwSetWindowUserPointer(window, this);
     // glfwSetMouseButtonCallback(window, mouse_button_callback);
@@ -112,7 +120,7 @@ void Game::Init() {
     float lastX = framebufferWidth / 2.0f;
     float lastY = framebufferHeight / 2.0f;
 
-    chunk = new Chunk(16,16,16, glm::vec3(0.0f, 0.0f, 0.0f) , this); ;
+    // chunk = new Chunk(16,16,16, glm::vec3(0.0f, 0.0f, 0.0f) , this); ;
     camera = new Camera();
     
    
@@ -142,7 +150,7 @@ void Game::UpdateChunks() {
     int playerChunkX = static_cast<int>(camera->cameraPos.x) / CHUNK_SIZE;
     int playerChunkZ = static_cast<int>(camera->cameraPos.z) / CHUNK_SIZE;
 
-    int renderDistance = 3;
+    int renderDistance = 1;
     for (int x = playerChunkX - renderDistance; x < playerChunkX + renderDistance; x++){
         for (int z = playerChunkZ - renderDistance; z < playerChunkZ + renderDistance; z++){
             std::pair<int, int> chunkPos = {x, z};
@@ -186,7 +194,7 @@ void Game::Render() {
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 100.0f);
     // chunk->render(view, projection);
     for (const auto& chunkPair : loadedChunks) {
-        cout << "Rendering chunk at " << chunkPair.first.first << " " << chunkPair.first.second << endl;
+        // cout << "Rendering chunk at " << chunkPair.first.first << " " << chunkPair.first.second << endl;
         chunkPair.second->render(view, projection);
     }
 
@@ -205,6 +213,5 @@ void Game::Run() {
         Update(deltaTime);
         ProcessInput(deltaTime);
         glfwPollEvents();
-        Update(0.0f);
     }
 }

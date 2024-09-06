@@ -1,33 +1,8 @@
 #version 330 core
+in vec3 ourColor; // Color coming from the vertex shader
 
 out vec4 FragColor;
 
-in vec3 FragPos;  // From the vertex shader
-in vec3 Normal;   // From the vertex shader
-
-// Lighting uniforms
-uniform vec3 lightDir;  // Direction of the sunlight
-uniform vec3 lightColor;  // Color of the sunlight
-uniform vec3 ambientColor;  // Ambient light color
-
-// Material properties
-uniform vec3 objectColor;  // The color of the object (can be passed per chunk)
-
-void main()
-{
-    // Normalize the normal
-    vec3 norm = normalize(Normal);
-    
-    // Ambient lighting (affects everything uniformly)
-    vec3 ambient = 0.2 * ambientColor;  // You can tweak the ambient strength here
-
-    // Directional lighting (sunlight)
-    vec3 lightDirNorm = normalize(lightDir);  // Ensure the light direction is normalized
-    float diff = max(dot(norm, -lightDirNorm), 0.0);  // Negative because the light is incoming
-    vec3 diffuse = diff * lightColor;
-
-    // Combine the ambient and directional lighting
-    vec3 result = (ambient + diffuse) * objectColor;
-    
-    FragColor = vec4(result, 1.0);  // Output the final color with alpha 1.0
+void main() {
+    FragColor = vec4(ourColor, 1.0); // Use interpolated color
 }

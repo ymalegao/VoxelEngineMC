@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 #include "Game.hpp"
+#include "PerlinNoise.hpp"
+
 
 class Game;
 
@@ -30,11 +32,12 @@ public:
     Game *gameRef;
 
 private:
-    unsigned int VAO, VBO, EBO;
+    unsigned int VAO, VBO, EBO, CBO;
     unsigned int shaderProgram;
     void loadShaders(const std::string& vertexPath, const std::string& fragmentPath);
     std::vector<float> vertices;
     std::vector<unsigned int> indices;
+    std::vector<float> colors;
     void setupMesh();
     void addFace(const glm::vec3& pos, Face face);
     bool isVoxelSolid(int x, int y, int z);
@@ -44,6 +47,7 @@ private:
     Chunk* getBackNeighbor();
     Chunk* getTopNeighbor();
     Chunk* getBottomNeighbor();
+
     
 
 };

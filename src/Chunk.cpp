@@ -4,8 +4,9 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
-#include "PerlinNoise.hpp"
 using namespace std;
+
+
 
 Chunk::Chunk(int sizeX, int sizeY, int sizeZ, glm::vec3 position , Game *gameRef) :
     sizeX(sizeX), sizeY(sizeY), sizeZ(sizeZ), position(position), gameRef(gameRef) {
@@ -13,7 +14,8 @@ Chunk::Chunk(int sizeX, int sizeY, int sizeZ, glm::vec3 position , Game *gameRef
     // this->sizeX = sizeX;
     // this->sizeY = sizeY;
     // this->sizeZ = sizeZ;
-    cout << "Creating chunk for sizes" << sizeX << sizeY << sizeX <<  "at position" << position.x << position.y << position.z << endl;
+
+    // cout << "Creating chunk for sizes" << sizeX << sizeY << sizeX <<  "at position" << position.x << position.y << position.z << endl;
     loadShaders("VertShader.vertexshader", "FragShader.fragmentshader");
     generateChunk();
     setupMesh();
@@ -72,14 +74,14 @@ void Chunk::loadShaders(const std::string& vertexPath, const std::string& fragme
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
 
-    cout << "Loaded shaders" << endl;
+    // cout << "Loaded shaders" << endl;
 }
 
 
 
 void Chunk::generateChunk(){
     
-    cout << "Generating chunk for sizes" << sizeX << sizeX << endl;
+    // cout << "Generating chunk for sizes" << sizeX << sizeX << endl;
     siv::PerlinNoise perlinNoise(1234);
     for (int x = 0; x < sizeX; x++){
         for (int z = 0; z < sizeZ; z++){
@@ -93,6 +95,9 @@ void Chunk::generateChunk(){
 
             for (int y = 0; y < height; y++){
                 glm::vec3 pos = glm::vec3(x, y, z);
+               
+
+                
                 if (y == height - 1 || !isVoxelSolid(x, y + 1, z)) {  // Top face
                     addFace(pos, Face::top);
                 }
@@ -121,6 +126,9 @@ void Chunk::generateChunk(){
 void Chunk::addFace(const glm::vec3&pos , Face face){
     float voxelVerts[12]; // 4 vertices * 3 coordinates
     unsigned int voxelIndices[6] = {0, 1, 2, 2, 3, 0}; // 2 triangles for each face
+    glm::vec3 faceColor;
+    float faceColors[12]; // 4 vertices * 3 color components (R, G, B)
+
 
     switch (face){
         case Face::top:
@@ -128,50 +136,75 @@ void Chunk::addFace(const glm::vec3&pos , Face face){
             voxelVerts[3] = pos.x + 0.5f; voxelVerts[4] = pos.y + 0.5f; voxelVerts[5] = pos.z - 0.5f;
             voxelVerts[6] = pos.x + 0.5f; voxelVerts[7] = pos.y + 0.5f; voxelVerts[8] = pos.z + 0.5f;
             voxelVerts[9] = pos.x - 0.5f; voxelVerts[10] = pos.y + 0.5f; voxelVerts[11] = pos.z + 0.5f;
+            faceColor = glm::vec3(1.0f, 0.0f, 0.0f);  // Red for top
+
+            
             break;
         case Face::bottom:
             voxelVerts[0] = pos.x - 0.5f; voxelVerts[1] = pos.y - 0.5f; voxelVerts[2] = pos.z - 0.5f;
             voxelVerts[3] = pos.x + 0.5f; voxelVerts[4] = pos.y - 0.5f; voxelVerts[5] = pos.z - 0.5f;
             voxelVerts[6] = pos.x + 0.5f; voxelVerts[7] = pos.y - 0.5f; voxelVerts[8] = pos.z + 0.5f;
             voxelVerts[9] = pos.x - 0.5f; voxelVerts[10] = pos.y - 0.5f; voxelVerts[11] = pos.z + 0.5f;
+            faceColor = glm::vec3(0.0f, 1.0f, 0.0f);  // Green for bottom
+            
             break;
         case Face::right:
             voxelVerts[0] = pos.x + 0.5f; voxelVerts[1] = pos.y - 0.5f; voxelVerts[2] = pos.z - 0.5f;
             voxelVerts[3] = pos.x + 0.5f; voxelVerts[4] = pos.y + 0.5f; voxelVerts[5] = pos.z - 0.5f;
             voxelVerts[6] = pos.x + 0.5f; voxelVerts[7] = pos.y + 0.5f; voxelVerts[8] = pos.z + 0.5f;
             voxelVerts[9] = pos.x + 0.5f; voxelVerts[10] = pos.y - 0.5f; voxelVerts[11] = pos.z + 0.5f;
+            faceColor = glm::vec3(0.0f, 0.0f, 1.0f);  // Blue for right
+            
             break;
         case Face::left:
             voxelVerts[0] = pos.x - 0.5f; voxelVerts[1] = pos.y - 0.5f; voxelVerts[2] = pos.z - 0.5f;
             voxelVerts[3] = pos.x - 0.5f; voxelVerts[4] = pos.y + 0.5f; voxelVerts[5] = pos.z - 0.5f;
             voxelVerts[6] = pos.x - 0.5f; voxelVerts[7] = pos.y + 0.5f; voxelVerts[8] = pos.z + 0.5f;
             voxelVerts[9] = pos.x - 0.5f; voxelVerts[10] = pos.y - 0.5f; voxelVerts[11] = pos.z + 0.5f;
+            faceColor = glm::vec3(1.0f, 1.0f, 0.0f);  // Yellow for left
+            
             break;
         case Face::front:
             voxelVerts[0] = pos.x - 0.5f; voxelVerts[1] = pos.y - 0.5f; voxelVerts[2] = pos.z + 0.5f;
             voxelVerts[3] = pos.x + 0.5f; voxelVerts[4] = pos.y - 0.5f; voxelVerts[5] = pos.z + 0.5f;
             voxelVerts[6] = pos.x + 0.5f; voxelVerts[7] = pos.y + 0.5f; voxelVerts[8] = pos.z + 0.5f;
             voxelVerts[9] = pos.x - 0.5f; voxelVerts[10] = pos.y + 0.5f; voxelVerts[11] = pos.z + 0.5f;
+            faceColor = glm::vec3(1.0f, 0.0f, 1.0f);  // Magenta for front
+            
             break;
         case Face::back:
             voxelVerts[0] = pos.x - 0.5f; voxelVerts[1] = pos.y - 0.5f; voxelVerts[2] = pos.z - 0.5f;
             voxelVerts[3] = pos.x + 0.5f; voxelVerts[4] = pos.y - 0.5f; voxelVerts[5] = pos.z - 0.5f;
             voxelVerts[6] = pos.x + 0.5f; voxelVerts[7] = pos.y + 0.5f; voxelVerts[8] = pos.z - 0.5f;
             voxelVerts[9] = pos.x - 0.5f; voxelVerts[10] = pos.y + 0.5f; voxelVerts[11] = pos.z - 0.5f;
+            faceColor = glm::vec3(0.0f, 1.0f, 1.0f);  // Cyan for back
+            
             break;
 
     }
 
+    for (int i = 0; i < 4; i++) {
+        faceColors[i * 3] = faceColor.r;
+        faceColors[i * 3 + 1] = faceColor.g;
+        faceColors[i * 3 + 2] = faceColor.b;
+    }
+
+    colors.insert(colors.end(), std::begin(faceColors), std::end(faceColors)); // Add the face's colors for each vertex
+
+
     vertices.insert(vertices.end(), std::begin(voxelVerts), std::end(voxelVerts));
+
     unsigned int offset = vertices.size() / 3 - 4;
     for (auto index : voxelIndices){
         indices.push_back(index + offset);
     }
 
+    
+
 }
 
 bool Chunk::isVoxelSolid(int x, int y, int z){
-    if (x >= 0 && x < sizeX && y >= 0 && y < sizeY && z >= 0 && z < sizeZ) {
+    if (x >= 0 && x < sizeX && y >= 0 && y < sizeY && z >= 0 && z < sizeZ) { // Check if the position is within the chunk
         // Generate the height for this (x, z) position using Perlin noise
         int worldX = static_cast<int>(position.x) + x;
         int worldZ = static_cast<int>(position.z) + z;
@@ -181,19 +214,27 @@ bool Chunk::isVoxelSolid(int x, int y, int z){
         float noiseValue = perlinNoise.octave2D_01(worldX * 0.02f, worldZ * 0.02f, 4, 0.5f);
         int height = static_cast<int>(noiseValue * sizeY);
 
-        // Check if the y position is below or at the generated height
-        return y <= height;
+
+        // Check if the y position is below or at the generated height or if it's the top layer 
+        return y <= height - 1;
     }
 
-    if (x == -1) {
+
+    //
+    if (x == -1) { // Check left neighbor outside of the chunk
         Chunk* leftNeighbor = getLeftNeighbor();
         if (leftNeighbor != nullptr) {
             return leftNeighbor->isVoxelSolid(sizeX - 1, y, z);
+        }else{
+            return false;
         }
+
     } else if (x == sizeX) {
         Chunk* rightNeighbor = getRightNeighbor();
         if (rightNeighbor != nullptr) {
             return rightNeighbor->isVoxelSolid(0, y, z);
+        }else{
+            return false;
         }
     }
 
@@ -222,7 +263,7 @@ bool Chunk::isVoxelSolid(int x, int y, int z){
     }
 
     // If no neighboring chunk exists, assume non-solid (empty space)
-    return false;
+    return true;
 }
 
 Chunk* Chunk::getLeftNeighbor() {
@@ -297,29 +338,38 @@ Chunk* Chunk::getBottomNeighbor() {
     return nullptr;
 }
 
-
 void Chunk::setupMesh(){
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
     glGenBuffers(1, &EBO);
+    glGenBuffers(1, &CBO); // Color buffer
 
     glBindVertexArray(VAO);
     
-    // Bind the vertex buffer
+    // Bind the vertex buffer (positions)
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
 
-    // Bind the element buffer
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
-
-    // Position attribute (corrected to match your vertex data layout)
+    // Vertex Position Attribute
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
+
+    // Bind the color buffer (colors)
+    glBindBuffer(GL_ARRAY_BUFFER, CBO);
+    glBufferData(GL_ARRAY_BUFFER, colors.size() * sizeof(float), colors.data(), GL_STATIC_DRAW);
+
+    // Vertex Color Attribute
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+
+    // Bind the element buffer (indices)
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 }
+
 
 void Chunk::render(const glm::mat4& view, const glm::mat4& projection) {
     glUseProgram(shaderProgram);
@@ -336,6 +386,8 @@ void Chunk::render(const glm::mat4& view, const glm::mat4& projection) {
 
     int projLoc = glGetUniformLocation(shaderProgram, "projection");
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+
+
 
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
