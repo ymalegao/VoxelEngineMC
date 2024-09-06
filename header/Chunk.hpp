@@ -30,10 +30,11 @@ public:
     int sizeX, sizeY, sizeZ;
     glm::vec3 position;
     Game *gameRef;
+    unsigned int shaderProgram;
+
 
 private:
     unsigned int VAO, VBO, EBO, CBO;
-    unsigned int shaderProgram;
     void loadShaders(const std::string& vertexPath, const std::string& fragmentPath);
     std::vector<float> vertices;
     std::vector<unsigned int> indices;

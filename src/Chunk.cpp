@@ -219,7 +219,6 @@ bool Chunk::isVoxelSolid(int x, int y, int z){
         return y <= height - 1;
     }
 
-
     //
     if (x == -1) { // Check left neighbor outside of the chunk
         Chunk* leftNeighbor = getLeftNeighbor();
