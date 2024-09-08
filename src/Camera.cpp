@@ -73,8 +73,8 @@ void Camera::updateCameraVectors()
         front.z = sin(glm::radians(Yaw)) * cos(glm::radians(Pitch));
         cameraFront = glm::normalize(front);
         // also re-calculate the Right and Up vector
-        cameraRight = glm::normalize(glm::cross(cameraFront, up));  // normalize the vectors, because their length gets closer to 0 the more you look up or down which results in slower movement.
-        up    = glm::normalize(glm::cross(cameraRight, cameraFront));
+        cameraRight = (glm::cross(cameraFront, up));  // normalize the vectors, because their length gets closer to 0 the more you look up or down which results in slower movement.
+        cameraUp = glm::normalize(glm::cross(cameraRight, cameraFront));
     }
 
 void Camera::processInput(Camera_Movement direction, float deltaTime){

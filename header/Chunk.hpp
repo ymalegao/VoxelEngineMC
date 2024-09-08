@@ -31,6 +31,10 @@ public:
     glm::vec3 position;
     Game *gameRef;
     unsigned int shaderProgram;
+    void highlightVoxel(const glm::ivec3& voxel);
+
+    bool isVoxelSolid(int x, int y, int z) ;
+
 
 
 private:
@@ -38,10 +42,11 @@ private:
     void loadShaders(const std::string& vertexPath, const std::string& fragmentPath);
     std::vector<float> vertices;
     std::vector<unsigned int> indices;
+    std::vector<std::vector<std::vector<bool>>> voxels; // 3D vector to store voxel states (true = solid, false = air)
+
     std::vector<float> colors;
     void setupMesh();
     void addFace(const glm::vec3& pos, Face face);
-    bool isVoxelSolid(int x, int y, int z);
     Chunk* getLeftNeighbor();
     Chunk* getRightNeighbor();
     Chunk* getFrontNeighbor();

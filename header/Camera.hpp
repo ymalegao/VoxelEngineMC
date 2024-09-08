@@ -19,14 +19,16 @@ class Camera {
         void updateCameraVectors();
         void processMouseScroll(float yoffset);
         glm::vec3 cameraPos; // current position of the camera
-
-    private:
         glm::vec3 cameraTarget; // where the camera is looking at
         glm::vec3 cameraDirection; // direction from the camera to the target
         glm::vec3 up; // up vector
         glm::vec3 cameraRight; // right vector
         glm::vec3 cameraUp; // up vector
         glm::vec3 cameraFront; // front vector
+        
+
+    private:
+        
         float deltaTime = 0.0f; // time between current frame and last frame
         float lastFrame = 0.0f; // time of last frame
         float Yaw;

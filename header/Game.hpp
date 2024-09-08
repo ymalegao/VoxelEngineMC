@@ -25,6 +25,7 @@ public:
     ~Game();
     GLuint shaderProgram; 
     ShaderLoader* shaderLoader;
+    bool raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, Chunk& chunk, glm::ivec3& hitVoxel, float maxDistance);
 
     void Run();
     std::unordered_map<std::pair<int, int>, Chunk*, pair_hash> loadedChunks;
@@ -33,6 +34,7 @@ public:
 private:
     int width, height;
     GLFWwindow* window;
+    bool castRayForVoxel(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, glm::ivec3& hitVoxel, float maxDistance);
    
 
     void Init();
@@ -44,6 +46,7 @@ private:
     // Callbacks
     static void framebuffer_size_callback(GLFWwindow* window, int width, int height);
     static void mouse_button_callback(GLFWwindow* window, double xposIn, double yposIn);
+    static void mouse_click_callback(GLFWwindow* window, int button, int action, int mods);
     static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 };
 

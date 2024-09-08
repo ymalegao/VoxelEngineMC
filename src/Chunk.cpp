@@ -14,6 +14,7 @@ Chunk::Chunk(int sizeX, int sizeY, int sizeZ, glm::vec3 position , Game *gameRef
     // this->sizeX = sizeX;
     // this->sizeY = sizeY;
     // this->sizeZ = sizeZ;
+    voxels = std::vector<std::vector<std::vector<bool>>>(sizeX, std::vector<std::vector<bool>>(sizeY, std::vector<bool>(sizeZ)));
 
     // cout << "Creating chunk for sizes" << sizeX << sizeY << sizeX <<  "at position" << position.x << position.y << position.z << endl;
     loadShaders("VertShader.vertexshader", "FragShader.fragmentshader");
@@ -94,27 +95,39 @@ void Chunk::generateChunk(){
             int height = static_cast<int>(noiseValue * sizeY);
 
             for (int y = 0; y < height; y++){
-                glm::vec3 pos = glm::vec3(x, y, z);
-               
+                if (y <= height - 1) {
+                    // Voxel is below or at the noise-generated height, so it's solid (ground)
+                    voxels[x][y][z] = true;
+                } else {
+                    // Voxel is above the noise-generated height, so it's air
+                    voxels[x][y][z] = false;
+                }
+
+                if (voxels[x][y][z]){
 
                 
-                if (y == height - 1 || !isVoxelSolid(x, y + 1, z)) {  // Top face
-                    addFace(pos, Face::top);
-                }
-                if (y == 0 || !isVoxelSolid(x, y - 1, z)) {  // Bottom face
-                    addFace(pos, Face::bottom);
-                }
-                if (x == sizeX - 1 || !isVoxelSolid(x + 1, y, z)) {  // Right face
-                    addFace(pos, Face::right);
-                }
-                if (x == 0 || !isVoxelSolid(x - 1, y, z)) {  // Left face
-                    addFace(pos, Face::left);
-                }
-                if (z == sizeZ - 1 || !isVoxelSolid(x, y, z + 1)) {  // Front face
-                    addFace(pos, Face::front);
-                }
-                if (z == 0 || !isVoxelSolid(x, y, z - 1)) {  // Back face
-                    addFace(pos, Face::back);
+                    glm::vec3 pos = glm::vec3(x, y, z);
+                
+
+                    
+                    if (y == height - 1 || !isVoxelSolid(x, y + 1, z)) {  // Top face
+                        addFace(pos, Face::top);
+                    }
+                    if (y == 0 || !isVoxelSolid(x, y - 1, z)) {  // Bottom face
+                        addFace(pos, Face::bottom);
+                    }
+                    if (x == sizeX - 1 || !isVoxelSolid(x + 1, y, z)) {  // Right face
+                        addFace(pos, Face::right);
+                    }
+                    if (x == 0 || !isVoxelSolid(x - 1, y, z)) {  // Left face
+                        addFace(pos, Face::left);
+                    }
+                    if (z == sizeZ - 1 || !isVoxelSolid(x, y, z + 1)) {  // Front face
+                        addFace(pos, Face::front);
+                    }
+                    if (z == 0 || !isVoxelSolid(x, y, z - 1)) {  // Back face
+                        addFace(pos, Face::back);
+                    }
                 }
                     
             }
@@ -203,20 +216,31 @@ void Chunk::addFace(const glm::vec3&pos , Face face){
 
 }
 
-bool Chunk::isVoxelSolid(int x, int y, int z){
-    if (x >= 0 && x < sizeX && y >= 0 && y < sizeY && z >= 0 && z < sizeZ) { // Check if the position is within the chunk
-        // Generate the height for this (x, z) position using Perlin noise
-        int worldX = static_cast<int>(position.x) + x;
-        int worldZ = static_cast<int>(position.z) + z;
+void Chunk::highlightVoxel(const glm::ivec3& voxel) {
+    // Ensure the voxel is within the chunk bounds
+    cout << "Highlighting voxel" << voxel.x << voxel.y << voxel.z << endl; 
+    if (voxel.x >= 0 && voxel.x < sizeX && voxel.y >= 0 && voxel.y < sizeY && voxel.z >= 0 && voxel.z < sizeZ) {
+        int faceStartIndex = voxel.x + voxel.y * sizeX + voxel.z * sizeX * sizeY;
+        
+        // Set the color for the highlighted voxel (e.g., white)
+        for (int i = 0; i < 6; i++) {
+            colors[faceStartIndex * 18 + i * 3] = 1.0f;      // R
+            colors[faceStartIndex * 18 + i * 3 + 1] = 1.0f;  // G
+            colors[faceStartIndex * 18 + i * 3 + 2] = 1.0f;  // B
+        }
+        cout << "done highlighting" << endl;
 
-        // Generate height using noise (adjust the scale and parameters as needed)
-        siv::PerlinNoise perlinNoise(1234);  // Seed for consistency across chunks
-        float noiseValue = perlinNoise.octave2D_01(worldX * 0.02f, worldZ * 0.02f, 4, 0.5f);
-        int height = static_cast<int>(noiseValue * sizeY);
+        // Update the color buffer (CBO)
+        glBindBuffer(GL_ARRAY_BUFFER, CBO);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, colors.size() * sizeof(float), colors.data());
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
+} 
 
-
-        // Check if the y position is below or at the generated height or if it's the top layer 
-        return y <= height - 1;
+bool Chunk::isVoxelSolid(int x, int y, int z) {
+    if (x >= 0 && x < sizeX && y >= 0 && y < sizeY && z >= 0 && z < sizeZ) {
+        int height = static_cast<int>(sizeY / 2);
+        return voxels[x][y][z];  // Return whether the voxel is solid
     }
 
     //

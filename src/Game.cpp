@@ -53,6 +53,34 @@ void Game::mouse_button_callback(GLFWwindow* window, double xposIn, double yposI
     camera->processMouseMovement(xoffset, yoffset);
 }
 
+void Game::mouse_click_callback(GLFWwindow* window, int button, int action, int mods) {
+    Game* game = (Game*)glfwGetWindowUserPointer(window);
+
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+        glm::vec3 rayOrigin = camera->cameraPos;         // The origin of the ray is the camera position
+        glm::vec3 rayDirection = camera->cameraFront;    // The ray is cast in the direction the camera is facing
+        glm::ivec3 hitVoxel;
+
+        cout << "Raycasting" << endl;
+        cout << "Ray Origin: " << rayOrigin.x << " " << rayOrigin.y << " " << rayOrigin.z << endl;
+        cout << "Ray Direction: " << rayDirection.x << " " << rayDirection.y << " " << rayDirection.z << endl;
+        
+        if (game->castRayForVoxel(rayOrigin, rayDirection, hitVoxel, 50.0f)) {
+        // If a voxel was hit, highlight or mark it (implement the logic to highlight)
+            cout << "Voxel hit at " << hitVoxel.x << " " << hitVoxel.y << " " << hitVoxel.z << endl;
+            //find the chunk that the ray is in
+            for (const auto& chunkPair : game->loadedChunks) {
+                if (chunkPair.second->position.x <= rayOrigin.x && rayOrigin.x < chunkPair.second->position.x + CHUNK_SIZE &&
+                    chunkPair.second->position.z <= rayOrigin.z && rayOrigin.z < chunkPair.second->position.z + CHUNK_SIZE) {
+                    chunkPair.second->highlightVoxel(hitVoxel);
+                }
+            }
+    }
+
+    }
+}
+
+
 void Game::key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
 
     std::cout << "Key callback: key=" << key << " action=" << action << std::endl;
@@ -61,6 +89,66 @@ void Game::key_callback(GLFWwindow* window, int key, int scancode, int action, i
 
 }
 
+
+bool Game::raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, Chunk& chunk, glm::ivec3& hitVoxel, float maxDistance) {
+    glm::vec3 rayPos = rayOrigin;  // Starting point of the ray
+    glm::vec3 stepSize = glm::vec3(1.0f) / glm::abs(rayDirection);  // Step size for each axis
+    glm::ivec3 currentVoxel = glm::ivec3(std::floor(rayPos.x), std::floor(rayPos.y), std::floor(rayPos.z));  // Starting voxel
+
+    glm::ivec3 step = glm::ivec3(rayDirection.x > 0 ? 1 : -1,
+                                 rayDirection.y > 0 ? 1 : -1,
+                                 rayDirection.z > 0 ? 1 : -1);
+
+    glm::vec3 tMax = (glm::vec3(currentVoxel) + glm::vec3(
+        step.x > 0 ? 1.0f : 0.0f, 
+        step.y > 0 ? 1.0f : 0.0f, 
+        step.z > 0 ? 1.0f : 0.0f) - rayPos) / rayDirection;    
+    float distance = 0.0f;
+
+    while (distance < maxDistance) {
+        // Debug the current ray position
+        std::cout << "Raycasting at voxel: (" << currentVoxel.x << ", " << currentVoxel.y << ", " << currentVoxel.z << ")" << std::endl;
+
+        // Check if the current voxel is solid
+        if (chunk.isVoxelSolid(currentVoxel.x, currentVoxel.y, currentVoxel.z)) {
+            hitVoxel = currentVoxel;  // Record the hit voxel
+            return true;  // Ray hit a solid voxel
+        }
+
+        // Move to the next voxel boundary based on tMax
+        if (tMax.x < tMax.y) {
+            if (tMax.x < tMax.z) {
+                currentVoxel.x += step.x;
+                distance = tMax.x;
+                tMax.x += stepSize.x;
+            } else {
+                currentVoxel.z += step.z;
+                distance = tMax.z;
+                tMax.z += stepSize.z;
+            }
+        } else {
+            if (tMax.y < tMax.z) {
+                currentVoxel.y += step.y;
+                distance = tMax.y;
+                tMax.y += stepSize.y;
+            } else {
+                currentVoxel.z += step.z;
+                distance = tMax.z;
+                tMax.z += stepSize.z;
+            }
+        }
+
+        // Break if ray exits chunk bounds
+        if (currentVoxel.x < 0 || currentVoxel.x >= chunk.sizeX ||
+            currentVoxel.y < 0 || currentVoxel.y >= chunk.sizeY ||
+            currentVoxel.z < 0 || currentVoxel.z >= chunk.sizeZ) {
+            break;
+        }
+    }
+    cout << "Raycast finished" << endl;
+    cout << "Ray hit nothing" << endl;
+    return false;  // No voxel was hit
+}
 
 Game::Game(int width, int height) 
     : width(width), height(height) {
@@ -112,7 +200,7 @@ void Game::Init() {
     glEnable(GL_DEPTH_TEST);
 
     glfwSetWindowUserPointer(window, this);
-    // glfwSetMouseButtonCallback(window, mouse_button_callback);
+    glfwSetMouseButtonCallback(window, mouse_click_callback);
     glfwSetCursorPosCallback(window, mouse_button_callback);
     glfwSetKeyCallback(window, key_callback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -175,6 +263,19 @@ void Game::UpdateChunks() {
         }
     }
 
+}
+
+
+bool Game::castRayForVoxel(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, glm::ivec3& hitVoxel, float maxDistance) {
+    //find the chunk that the ray is in
+    for (const auto& chunkPair : loadedChunks) {
+        if (chunkPair.second->position.x <= rayOrigin.x && rayOrigin.x < chunkPair.second->position.x + CHUNK_SIZE &&
+            chunkPair.second->position.z <= rayOrigin.z && rayOrigin.z < chunkPair.second->position.z + CHUNK_SIZE) {
+            
+            return raycast(rayOrigin, rayDirection, *chunkPair.second, hitVoxel, maxDistance);
+        }
+    }
+    
 }
 
 void Game::Render() {
