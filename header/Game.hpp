@@ -1,6 +1,7 @@
 #ifndef GAME_HPP
 #define GAME_HPP
 #include <glad/glad.h>
+#include <OpenGL/gl.h>
 #include <GLFW/glfw3.h>
 #include <vector>
 #include "Chunk.hpp"
@@ -26,6 +27,7 @@ public:
     GLuint shaderProgram; 
     ShaderLoader* shaderLoader;
     bool raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, Chunk& chunk, glm::ivec3& hitVoxel, float maxDistance);
+    void drawRay(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, float length);
 
     void Run();
     std::unordered_map<std::pair<int, int>, Chunk*, pair_hash> loadedChunks;
@@ -42,6 +44,8 @@ private:
     void Update(float deltaTime);
     void Render();
     void UpdateChunks();
+    GLuint rayVAO, rayVBO;
+
 
     // Callbacks
     static void framebuffer_size_callback(GLFWwindow* window, int width, int height);

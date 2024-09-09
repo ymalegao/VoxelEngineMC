@@ -15,9 +15,12 @@ Chunk::Chunk(int sizeX, int sizeY, int sizeZ, glm::vec3 position , Game *gameRef
     // this->sizeY = sizeY;
     // this->sizeZ = sizeZ;
     voxels = std::vector<std::vector<std::vector<bool>>>(sizeX, std::vector<std::vector<bool>>(sizeY, std::vector<bool>(sizeZ)));
+    //initialize voxels
+    
 
     // cout << "Creating chunk for sizes" << sizeX << sizeY << sizeX <<  "at position" << position.x << position.y << position.z << endl;
     loadShaders("VertShader.vertexshader", "FragShader.fragmentshader");
+    initChunk();
     generateChunk();
     setupMesh();
 }
@@ -79,10 +82,7 @@ void Chunk::loadShaders(const std::string& vertexPath, const std::string& fragme
 }
 
 
-
-void Chunk::generateChunk(){
-    
-    // cout << "Generating chunk for sizes" << sizeX << sizeX << endl;
+void Chunk::initChunk(){
     siv::PerlinNoise perlinNoise(1234);
     for (int x = 0; x < sizeX; x++){
         for (int z = 0; z < sizeZ; z++){
@@ -94,23 +94,29 @@ void Chunk::generateChunk(){
 
             int height = static_cast<int>(noiseValue * sizeY);
 
-            for (int y = 0; y < height; y++){
-                if (y <= height - 1) {
-                    // Voxel is below or at the noise-generated height, so it's solid (ground)
-                    voxels[x][y][z] = true;
-                } else {
-                    // Voxel is above the noise-generated height, so it's air
-                    voxels[x][y][z] = false;
-                }
+            for (int y = 0; y < sizeY; y++){
+                voxels[x][y][z] = (y <= height - 1);
+            }
+        }
+    }
+}
 
-                if (voxels[x][y][z]){
 
-                
+void Chunk::generateChunk(){
+    vertices.clear();
+    indices.clear();
+    colors.clear();
+    
+    // cout << "Generating chunk for sizes" << sizeX << sizeX << endl;
+    for (int x = 0; x < sizeX; x++){
+        for (int z = 0; z < sizeZ; z++){
+            for (int y = 0; y < sizeY; y++){
+                // Only process solid voxels
+                if (voxels[x][y][z]) {
                     glm::vec3 pos = glm::vec3(x, y, z);
-                
 
-                    
-                    if (y == height - 1 || !isVoxelSolid(x, y + 1, z)) {  // Top face
+                    // Face culling logic: only add the face if it's adjacent to air or chunk boundary
+                    if (y == sizeY - 1 || !isVoxelSolid(x, y + 1, z)) {  // Top face
                         addFace(pos, Face::top);
                     }
                     if (y == 0 || !isVoxelSolid(x, y - 1, z)) {  // Bottom face
@@ -129,7 +135,6 @@ void Chunk::generateChunk(){
                         addFace(pos, Face::back);
                     }
                 }
-                    
             }
         }
     }
@@ -230,17 +235,25 @@ void Chunk::highlightVoxel(const glm::ivec3& voxel) {
         }
         cout << "done highlighting" << endl;
 
-        // Update the color buffer (CBO)
-        glBindBuffer(GL_ARRAY_BUFFER, CBO);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, colors.size() * sizeof(float), colors.data());
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        
     }
+    generateChunk();
+    setupMesh();
+
 } 
 
 bool Chunk::isVoxelSolid(int x, int y, int z) {
     if (x >= 0 && x < sizeX && y >= 0 && y < sizeY && z >= 0 && z < sizeZ) {
-        int height = static_cast<int>(sizeY / 2);
-        return voxels[x][y][z];  // Return whether the voxel is solid
+        int worldX = static_cast<int>(position.x) + x;
+        int worldZ = static_cast<int>(position.z) + z;
+
+        // Generate height using noise (adjust the scale and parameters as needed)
+        siv::PerlinNoise perlinNoise(1234);  // Seed for consistency across chunks
+        float noiseValue = perlinNoise.octave2D_01(worldX * 0.02f, worldZ * 0.02f, 4, 0.5f);
+        int height = static_cast<int>(noiseValue * sizeY);
+        // voxels[x][y][z] = (y <= height - 1);
+        // Check if the y position is below or at the generated height or if it's the top layer 
+        return voxels[x][y][z];
     }
 
     //
@@ -391,6 +404,25 @@ void Chunk::setupMesh(){
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
+}
+
+void Chunk::randomlyRemoveVoxels(){
+    int x = rand() % sizeX;
+    
+    int z = rand() % sizeZ;
+    // y height should be from surface, so we start from the top
+    for (int y = sizeY - 1; y >= 0; --y) {
+        if (voxels[x][y][z]) {
+            // Remove this voxel
+            voxels[x][y][z] = false;
+            std::cout << "Removing voxel at " << x << ", " << y << ", " << z << std::endl;
+
+            // Regenerate chunk to reflect the change
+            generateChunk();
+            setupMesh();
+            break;  // Stop after removing one voxel
+        }
+    }
 }
 
 

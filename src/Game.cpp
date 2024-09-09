@@ -57,6 +57,11 @@ void Game::mouse_click_callback(GLFWwindow* window, int button, int action, int 
     Game* game = (Game*)glfwGetWindowUserPointer(window);
 
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+        for (const auto& chunkPair : game->loadedChunks) {
+                chunkPair.second->randomlyRemoveVoxels();
+            } 
+        
+        
         glm::vec3 rayOrigin = camera->cameraPos;         // The origin of the ray is the camera position
         glm::vec3 rayDirection = camera->cameraFront;    // The ray is cast in the direction the camera is facing
         glm::ivec3 hitVoxel;
@@ -204,6 +209,20 @@ void Game::Init() {
     glfwSetCursorPosCallback(window, mouse_button_callback);
     glfwSetKeyCallback(window, key_callback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glGenVertexArrays(1, &rayVAO);
+    glGenBuffers(1, &rayVBO);
+
+    glBindVertexArray(rayVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, rayVBO);
+
+    // Allocate space for 2 vertices (start and end of the line)
+    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * 2, nullptr, GL_DYNAMIC_DRAW);
+
+    // Specify vertex attribute pointer for position
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glBindVertexArray(0);
 
     // Initialize game objects
     float lastX = framebufferWidth / 2.0f;
@@ -213,6 +232,15 @@ void Game::Init() {
     camera = new Camera();
     shaderProgram = shaderLoader->loadShaders("VertShader.vertexshader", "FragShader.fragmentshader");    
    
+}
+void Game::drawRay(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, float length) {
+    glm::vec3 rayEnd = rayOrigin + rayDirection * length;
+
+    // Update the VBO with new vertex data (ray origin and ray end)
+    glm::vec3 vertices[] = { rayOrigin, rayEnd };
+    glBindBuffer(GL_ARRAY_BUFFER, rayVBO);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 void Game::ProcessInput(float deltaTime) {
@@ -231,7 +259,10 @@ void Game::ProcessInput(float deltaTime) {
 
 }
 
+
+
 void Game::Update(float deltaTime) {
+
     UpdateChunks();
 }
 
@@ -283,10 +314,13 @@ void Game::Render() {
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     //set color to sky blue
+    glClearColor(0.53f, 0.81f, 0.98f, 1.0f);
     glm::vec3 lightDir = glm::normalize(glm::vec3(-0.2f, -1.0f, -0.3f));  // Direction of light
     glm::vec3 lightColor = glm::vec3(1.0f, -1.0f, 1.0f);  // White light
     glm::vec3 ambientColor = glm::vec3(0.53f, 0.81f, 0.98f);  // Light sky blue as ambient
     glm::vec3 objectColor = glm::vec3(0.7f, 0.3f, 0.3f);  // Example color for voxels (reddish)
+
+    glUseProgram(shaderProgram);
 
     // Pass the light information to the shader
     GLuint lightDirLoc = glGetUniformLocation(shaderProgram, "lightDir");
@@ -298,7 +332,7 @@ void Game::Render() {
     glUniform3fv(lightColorLoc, 1, glm::value_ptr(lightColor));
     glUniform3fv(ambientColorLoc, 1, glm::value_ptr(ambientColor));
     glUniform3fv(objectColorLoc, 1, glm::value_ptr(objectColor));
-
+    
 
     
     
@@ -317,9 +351,44 @@ void Game::Render() {
         chunkPair.second->render(shaderProgram, view, projection);
     }
 
+    // Render the ray
+
+        // glUseProgram(camera->shaderProgram);
+        // view = camera->getViewMatrix();
+        // projection = glm::perspective(glm::radians(45.0f), (float)800 / (float)600, 0.1f, 100.0f);
+        // GLuint viewLoc = glGetUniformLocation(camera->shaderProgram, "view");
+        // GLuint projectionLoc = glGetUniformLocation(camera->shaderProgram, "projection");
+        // GLuint colorLoc = glGetUniformLocation(camera->shaderProgram, "objectColor");
+
+        // if (viewLoc == -1) {
+        //     std::cout << "Error: View location not found." << std::endl;
+        // }
+
+        // if (projectionLoc == -1) {
+        //     std::cout << "Error: Projection location not found." << std::endl;
+        // }
+
+        // if (colorLoc == -1) {
+        //     std::cout << "Error: Color location not found." << std::endl;
+        // }
+        
+        // glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+        // glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+        // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);  // Set to line mode
+        // camera->render(camera->shaderProgram, 50.0f);
+        // glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);  // Revert back to fill mode
+
+        // GLenum error = glGetError();
+        // if (error != GL_NO_ERROR) {
+        //     std::cout << "OpenGL Error: " << error << std::endl;
+        // }
+   
+
 
     glfwSwapBuffers(window);
 }
+
+
 
 void Game::Run() {
     Init();

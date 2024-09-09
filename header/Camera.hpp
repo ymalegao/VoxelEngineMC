@@ -1,5 +1,8 @@
 #pragma once
 #include <glm/glm.hpp>
+#include "ShaderLoader.hpp"
+
+
 
 enum Camera_Movement {
     FORWARD,
@@ -25,7 +28,13 @@ class Camera {
         glm::vec3 cameraRight; // right vector
         glm::vec3 cameraUp; // up vector
         glm::vec3 cameraFront; // front vector
-        
+        GLuint shaderProgram;
+        ShaderLoader *shaderLoader;
+        void render(GLuint shaderProgram, float rayLength);
+        GLuint rayVAO, rayVBO;  // Add this in Camera class or Game class
+        void initRayRendering();
+        int width, height;
+
 
     private:
         
