@@ -57,9 +57,9 @@ void Game::mouse_click_callback(GLFWwindow* window, int button, int action, int 
     Game* game = (Game*)glfwGetWindowUserPointer(window);
 
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-        for (const auto& chunkPair : game->loadedChunks) {
-                chunkPair.second->randomlyRemoveVoxels();
-            } 
+        // for (const auto& chunkPair : game->loadedChunks) {
+        //         chunkPair.second->randomlyRemoveVoxels();
+        //     } 
         
         
         glm::vec3 rayOrigin = camera->cameraPos;         // The origin of the ray is the camera position
@@ -74,12 +74,6 @@ void Game::mouse_click_callback(GLFWwindow* window, int button, int action, int 
         // If a voxel was hit, highlight or mark it (implement the logic to highlight)
             cout << "Voxel hit at " << hitVoxel.x << " " << hitVoxel.y << " " << hitVoxel.z << endl;
             //find the chunk that the ray is in
-            for (const auto& chunkPair : game->loadedChunks) {
-                if (chunkPair.second->position.x <= rayOrigin.x && rayOrigin.x < chunkPair.second->position.x + CHUNK_SIZE &&
-                    chunkPair.second->position.z <= rayOrigin.z && rayOrigin.z < chunkPair.second->position.z + CHUNK_SIZE) {
-                    chunkPair.second->highlightVoxel(hitVoxel);
-                }
-            }
     }
 
     }
@@ -117,6 +111,10 @@ bool Game::raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, Ch
         // Check if the current voxel is solid
         if (chunk.isVoxelSolid(currentVoxel.x, currentVoxel.y, currentVoxel.z)) {
             hitVoxel = currentVoxel;  // Record the hit voxel
+            chunk.voxels[currentVoxel.x][currentVoxel.y][currentVoxel.z] = false;  // Remove the voxel
+            chunk.generateChunk();  // Regenerate the chunk
+            chunk.setupMesh();  // Setup the mesh
+            cout << "we hit a solid voxel" << endl;
             return true;  // Ray hit a solid voxel
         }
 
@@ -270,7 +268,7 @@ void Game::UpdateChunks() {
     int playerChunkX = static_cast<int>(camera->cameraPos.x) / CHUNK_SIZE;
     int playerChunkZ = static_cast<int>(camera->cameraPos.z) / CHUNK_SIZE;
 
-    int renderDistance = 1;
+    int renderDistance = 3;
     for (int x = playerChunkX - renderDistance; x < playerChunkX + renderDistance; x++){
         for (int z = playerChunkZ - renderDistance; z < playerChunkZ + renderDistance; z++){
             std::pair<int, int> chunkPos = {x, z};
@@ -302,7 +300,7 @@ bool Game::castRayForVoxel(const glm::vec3& rayOrigin, const glm::vec3& rayDirec
     for (const auto& chunkPair : loadedChunks) {
         if (chunkPair.second->position.x <= rayOrigin.x && rayOrigin.x < chunkPair.second->position.x + CHUNK_SIZE &&
             chunkPair.second->position.z <= rayOrigin.z && rayOrigin.z < chunkPair.second->position.z + CHUNK_SIZE) {
-            
+            cout << "Ray is in chunk at " << chunkPair.first.first << " " << chunkPair.first.second << endl;
             return raycast(rayOrigin, rayDirection, *chunkPair.second, hitVoxel, maxDistance);
         }
     }

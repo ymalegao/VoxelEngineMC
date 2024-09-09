@@ -82,20 +82,31 @@ void Chunk::loadShaders(const std::string& vertexPath, const std::string& fragme
 }
 
 
-void Chunk::initChunk(){
+void Chunk::initChunk() {
     siv::PerlinNoise perlinNoise(1234);
-    for (int x = 0; x < sizeX; x++){
-        for (int z = 0; z < sizeZ; z++){
-            
+    for (int x = 0; x < sizeX; x++) {
+        for (int z = 0; z < sizeZ; z++) {
             int worldX = static_cast<int>(position.x) + x;
             int worldZ = static_cast<int>(position.z) + z;
-            
-            float noiseValue = perlinNoise.octave2D_01(worldX * 0.02f, worldZ * 0.02f, 4, 0.5f);
 
-            int height = static_cast<int>(noiseValue * sizeY);
+            // 2D noise for surface height
+            float noiseValue2D = perlinNoise.octave2D_01(worldX * 0.02f, worldZ * 0.02f, 4, 0.5f);
+            int surfaceHeight = static_cast<int>(noiseValue2D * sizeY);
 
-            for (int y = 0; y < sizeY; y++){
-                voxels[x][y][z] = (y <= height - 1);
+            for (int y = 0; y < sizeY; y++) {
+                int worldY = static_cast<int>(position.y) + y;
+
+                // 3D noise for caves
+                float noiseValue3D = perlinNoise.octave3D_01(worldX * 0.1f, worldY * 0.1f, worldZ * 0.1f, 4, 0.5f);
+                
+                // Caves: Create caves based on 3D noise value
+                if (noiseValue3D < 0.4f && y < surfaceHeight) {
+                    voxels[x][y][z] = false; // Create a cave
+                } else if (y <= surfaceHeight) {
+                    voxels[x][y][z] = true;  // Solid ground
+                } else {
+                    voxels[x][y][z] = false; // Air above the ground
+                }
             }
         }
     }
@@ -253,6 +264,8 @@ bool Chunk::isVoxelSolid(int x, int y, int z) {
         int height = static_cast<int>(noiseValue * sizeY);
         // voxels[x][y][z] = (y <= height - 1);
         // Check if the y position is below or at the generated height or if it's the top layer 
+        // cout << "Checking voxel" << x << y << z << endl;
+        // cout << "voxel is " << voxels[x][y][z] << endl;
         return voxels[x][y][z];
     }
 
