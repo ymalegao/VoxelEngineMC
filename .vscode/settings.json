@@ -48,6 +48,10 @@
         "typeinfo": "cpp",
         "unordered_map": "cpp",
         "variant": "cpp",
-        "algorithm": "cpp"
+        "algorithm": "cpp",
+        "queue": "cpp",
+        "charconv": "cpp",
+        "condition_variable": "cpp",
+        "deque": "cpp"
     }
 }

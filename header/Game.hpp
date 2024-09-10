@@ -8,6 +8,7 @@
 #include <utility>      // For std::pair
 #include <functional>   // For std::hash
 #include "ShaderLoader.hpp"
+#include "ThreadPool.hpp"
 class Chunk;
 
 

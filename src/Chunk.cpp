@@ -8,8 +8,8 @@ using namespace std;
 
 
 
-Chunk::Chunk(int sizeX, int sizeY, int sizeZ, glm::vec3 position , Game *gameRef) :
-    sizeX(sizeX), sizeY(sizeY), sizeZ(sizeZ), position(position), gameRef(gameRef) {
+Chunk::Chunk(int sizeX, int sizeY, int sizeZ, glm::vec3 position , Game *gameRef, GLuint shaderProgram) :
+    sizeX(sizeX), sizeY(sizeY), sizeZ(sizeZ), position(position), gameRef(gameRef), shaderProgram(shaderProgram) {
     // Load shaders
     // this->sizeX = sizeX;
     // this->sizeY = sizeY;
@@ -19,10 +19,10 @@ Chunk::Chunk(int sizeX, int sizeY, int sizeZ, glm::vec3 position , Game *gameRef
     
 
     // cout << "Creating chunk for sizes" << sizeX << sizeY << sizeX <<  "at position" << position.x << position.y << position.z << endl;
-    loadShaders("VertShader.vertexshader", "FragShader.fragmentshader");
+    // loadShaders("VertShader.vertexshader", "FragShader.fragmentshader");
     initChunk();
     generateChunk();
-    setupMesh();
+    // setupMesh();
 }
 
 Chunk::~Chunk() {

@@ -5,6 +5,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
+#include <unordered_set>
 using namespace std;
 
 #include <utility>      // For std::pair
@@ -12,7 +13,14 @@ using namespace std;
 
 // Custom hash function for std::pair<int, int>
 
-
+namespace std {
+    template <>
+    struct hash<std::pair<int, int>> {
+        size_t operator()(const std::pair<int, int>& pair) const {
+            return std::hash<int>()(pair.first) ^ std::hash<int>()(pair.second);
+        }
+    };
+}
 
 #define CHUNK_SIZE 16
 
@@ -24,7 +32,11 @@ float lastX = 0.0f;
 float lastY = 0.0f;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
+ThreadPool threadPool(8);
 
+
+std::deque<Chunk*> chunksToAdd;
+std::mutex chunkMutex;
 
 
 
@@ -59,7 +71,7 @@ void Game::mouse_click_callback(GLFWwindow* window, int button, int action, int 
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
         // for (const auto& chunkPair : game->loadedChunks) {
         //         chunkPair.second->randomlyRemoveVoxels();
-        //     } 
+      
         
         
         glm::vec3 rayOrigin = camera->cameraPos;         // The origin of the ray is the camera position
@@ -263,6 +275,8 @@ void Game::Update(float deltaTime) {
 
     UpdateChunks();
 }
+std::unordered_set<std::pair<int, int>> chunksInQueue;
+
 
 void Game::UpdateChunks() {
     int playerChunkX = static_cast<int>(camera->cameraPos.x) / CHUNK_SIZE;
@@ -273,11 +287,35 @@ void Game::UpdateChunks() {
         for (int z = playerChunkZ - renderDistance; z < playerChunkZ + renderDistance; z++){
             std::pair<int, int> chunkPos = {x, z};
 
-            if (loadedChunks.find(chunkPos) == loadedChunks.end()) {
-                loadedChunks[chunkPos] = new Chunk(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE, glm::vec3(x * CHUNK_SIZE, 0.0f, z * CHUNK_SIZE) , this);
+            if (loadedChunks.find(chunkPos) == loadedChunks.end() && chunksInQueue.find(chunkPos) == chunksInQueue.end()) {
+                // Only enqueue if the chunk is neither loaded nor already in the queue
+                std::cout << "Enqueueing new chunk at: (" << x << ", " << z << ")" << std::endl;
+                chunksInQueue.insert(chunkPos); // Mark chunk as enqueued
+                
+                threadPool.enqueueTask([this, chunkPos, x, z]() {
+                    Chunk* newChunk = new Chunk(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE, glm::vec3(x * CHUNK_SIZE, 0.0f, z * CHUNK_SIZE), this, shaderProgram);
+                    
+                    std::lock_guard<std::mutex> lock(chunkMutex);
+                    chunksToAdd.push_back(newChunk);
+
+                    chunksInQueue.erase(chunkPos); // Remove from the queue once processed
+                });
             }
         }
     }
+
+    std::lock_guard<std::mutex> lock(chunkMutex);
+    while (!chunksToAdd.empty()) {
+
+        // std::lock_guard<std::mutex> lock(chunkMutex);
+
+        Chunk* newChunk = chunksToAdd.front();
+        chunksToAdd.pop_front();
+        newChunk->setupMesh();
+        loadedChunks[{static_cast<int>(newChunk->position.x / CHUNK_SIZE), static_cast<int>(newChunk->position.z / CHUNK_SIZE)}] = newChunk;
+        cout << "Loaded chunk at " << newChunk->position.x << " " << newChunk->position.z << endl;
+    }
+
 
     for (auto it = loadedChunks.begin(); it != loadedChunks.end();) {
         std::pair<int, int> chunkPos = it->first;

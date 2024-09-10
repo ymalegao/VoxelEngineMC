@@ -23,7 +23,7 @@ enum Face {
 
 class Chunk {
 public:
-    Chunk(int sizeX, int sizeY, int sizeZ, glm::vec3 position, Game *gameRef);
+    Chunk(int sizeX, int sizeY, int sizeZ, glm::vec3 position, Game *gameRef, GLuint shaderProgram);
     ~Chunk();
     void randomlyRemoveVoxels();
     void render(GLuint shaderProgram, const glm::mat4& view, const glm::mat4& projection);
@@ -34,6 +34,8 @@ public:
     Game *gameRef;
     unsigned int shaderProgram;
     void highlightVoxel(const glm::ivec3& voxel);
+    void loadShaders(const std::string& vertexPath, const std::string& fragmentPath);
+
 
     bool isVoxelSolid(int x, int y, int z) ;
     std::vector<std::vector<std::vector<bool>>> voxels; // 3D vector to store voxel states (true = solid, false = air)
@@ -44,7 +46,6 @@ public:
 
 private:
     unsigned int VAO, VBO, EBO, CBO;
-    void loadShaders(const std::string& vertexPath, const std::string& fragmentPath);
     std::vector<float> vertices;
     std::vector<unsigned int> indices;
 
