@@ -14,6 +14,8 @@ GLuint TextureManager::loadTexture(const std::string& texturePath) {
     GLuint textureID;
     glGenTextures(1, &textureID);
     glBindTexture(GL_TEXTURE_2D, textureID);
+    stbi_set_flip_vertically_on_load(true);
+
 
     // Set texture parameters
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -44,6 +46,7 @@ GLuint TextureManager::createTextureFromFile(const std::string& texturePath) {
         glGenTextures(1, &textureID);
         glBindTexture(GL_TEXTURE_2D, textureID);
         //rotate the texture 90 degrees
+        stbi_set_flip_vertically_on_load(true);
         
 
 

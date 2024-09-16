@@ -15,7 +15,7 @@ class Game;
 
 
 
-enum class BlockType { Air, Grass, Stone };
+enum class BlockType { Air, Grass, Stone, Dirt };
 
 enum Face {
     front,

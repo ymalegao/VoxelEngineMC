@@ -375,7 +375,7 @@ void Game::Render() {
 
     // Bind the texture atlas once (assuming you have the texture atlas loaded in texture unit 0)
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, textureManager->loadTexture("pics/spritesheet.png"));
+    glBindTexture(GL_TEXTURE_2D, textureManager->loadTexture("pics/mcspritesheet.png"));
     GLint textureUniformLoc = glGetUniformLocation(shaderProgram, "blockTexture");
     glUniform1i(textureUniformLoc, 0);  // Texture unit 0
 
