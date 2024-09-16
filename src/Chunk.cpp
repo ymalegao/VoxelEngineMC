@@ -6,18 +6,25 @@
 #include <iostream>
 using namespace std;
 
+GLenum err;
+#define CHECK_GL_ERROR() \
+    while ((err = glGetError()) != GL_NO_ERROR) { \
+        std::cerr << "OpenGL error: " << err << " at line " << __LINE__ << std::endl; \
+    }
+    
 
 
-Chunk::Chunk(int sizeX, int sizeY, int sizeZ, glm::vec3 position , Game *gameRef, GLuint shaderProgram) :
-    sizeX(sizeX), sizeY(sizeY), sizeZ(sizeZ), position(position), gameRef(gameRef), shaderProgram(shaderProgram) {
+
+Chunk::Chunk(int sizeX, int sizeY, int sizeZ, glm::vec3 position , Game *gameRef, GLuint shaderProgram, TextureManager& textureManager) :
+    sizeX(sizeX), sizeY(sizeY), sizeZ(sizeZ), position(position), gameRef(gameRef), shaderProgram(shaderProgram), textureManager(textureManager) {
     // Load shaders
     // this->sizeX = sizeX;
     // this->sizeY = sizeY;
     // this->sizeZ = sizeZ;
-    voxels = std::vector<std::vector<std::vector<bool>>>(sizeX, std::vector<std::vector<bool>>(sizeY, std::vector<bool>(sizeZ)));
+
+    voxels = std::vector<std::vector<std::vector<BlockType>>>(sizeX, std::vector<std::vector<BlockType>>(sizeY, std::vector<BlockType>(sizeZ)));
     //initialize voxels
     
-
     // cout << "Creating chunk for sizes" << sizeX << sizeY << sizeX <<  "at position" << position.x << position.y << position.z << endl;
     // loadShaders("VertShader.vertexshader", "FragShader.fragmentshader");
     initChunk();
@@ -29,6 +36,7 @@ Chunk::~Chunk() {
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
     glDeleteBuffers(1, &EBO);
+    glDeleteBuffers(1, &TBO);
     glDeleteProgram(shaderProgram);
 }
 
@@ -101,11 +109,13 @@ void Chunk::initChunk() {
                 
                 // Caves: Create caves based on 3D noise value
                 if (noiseValue3D < 0.4f && y < surfaceHeight) {
-                    voxels[x][y][z] = false; // Create a cave
-                } else if (y <= surfaceHeight) {
-                    voxels[x][y][z] = true;  // Solid ground
+                    voxels[x][y][z] = BlockType::Air;  // Cave
+                } else if (y == surfaceHeight) {
+                    voxels[x][y][z] = BlockType::Grass;  // Grass block
+                } else if (y < surfaceHeight) {
+                    voxels[x][y][z] = BlockType::Stone;  // Stone block
                 } else {
-                    voxels[x][y][z] = false; // Air above the ground
+                    voxels[x][y][z] = BlockType::Air;  // Air
                 }
             }
         }
@@ -116,16 +126,18 @@ void Chunk::initChunk() {
 void Chunk::generateChunk(){
     vertices.clear();
     indices.clear();
-    colors.clear();
+    texCoordsArray.clear();
     
     // cout << "Generating chunk for sizes" << sizeX << sizeX << endl;
     for (int x = 0; x < sizeX; x++){
         for (int z = 0; z < sizeZ; z++){
             for (int y = 0; y < sizeY; y++){
+                
                 // Only process solid voxels
-                if (voxels[x][y][z]) {
+                if (voxels[x][y][z] != BlockType::Air) {
                     glm::vec3 pos = glm::vec3(x, y, z);
 
+                   
                     // Face culling logic: only add the face if it's adjacent to air or chunk boundary
                     if (y == sizeY - 1 || !isVoxelSolid(x, y + 1, z)) {  // Top face
                         addFace(pos, Face::top);
@@ -151,86 +163,147 @@ void Chunk::generateChunk(){
     }
 }
 
+void Chunk::addFace(const glm::vec3& pos, Face face) {
+    BlockType blockType = voxels[pos.x][pos.y][pos.z];
+    glm::vec2 texCoords[4];
+    float textureSize = 1.0f / 3.0f;  // 16x16 texture atlas
 
-void Chunk::addFace(const glm::vec3&pos , Face face){
-    float voxelVerts[12]; // 4 vertices * 3 coordinates
-    unsigned int voxelIndices[6] = {0, 1, 2, 2, 3, 0}; // 2 triangles for each face
-    glm::vec3 faceColor;
-    float faceColors[12]; // 4 vertices * 3 color components (R, G, B)
+    if (blockType == BlockType::Grass) {
+        if (face == Face::top) {
+            // First texture (Grass top) - bottom-left of the atlas
+            texCoords[0] = glm::vec2(0.0f, 1.0f);                        // Bottom-left
+            texCoords[1] = glm::vec2(textureSize, 1.0f);                  // Bottom-right
+            texCoords[2] = glm::vec2(textureSize, 0.0f);                  // Top-right
+            texCoords[3] = glm::vec2(0.0f, 0.0f);                        // Top-left
+        } else {
+            // Second texture (Grass side) - middle of the atlas
+            texCoords[0] = glm::vec2(textureSize, 1.0f);                  // Bottom-left
+            texCoords[1] = glm::vec2(2 * textureSize, 1.0f);              // Bottom-right
+            texCoords[2] = glm::vec2(2 * textureSize, 0.0f);              // Top-right
+            texCoords[3] = glm::vec2(textureSize, 0.0f);                  // Top-left
+        }
+    } else if (blockType == BlockType::Stone) {
+        // Third texture (Stone) - rightmost of the atlas
+        texCoords[0] = glm::vec2(2 * textureSize, 1.0f);                  // Bottom-left
+        texCoords[1] = glm::vec2(3 * textureSize, 1.0f);                  // Bottom-right
+        texCoords[2] = glm::vec2(3 * textureSize, 0.0f);                  // Top-right
+        texCoords[3] = glm::vec2(2 * textureSize, 0.0f);                  // Top-left
+    }
 
 
-    switch (face){
+    // Calculate the texture coordinates
+    float voxelVerts[12];
+    switch (face) {
         case Face::top:
             voxelVerts[0] = pos.x - 0.5f; voxelVerts[1] = pos.y + 0.5f; voxelVerts[2] = pos.z - 0.5f;
             voxelVerts[3] = pos.x + 0.5f; voxelVerts[4] = pos.y + 0.5f; voxelVerts[5] = pos.z - 0.5f;
             voxelVerts[6] = pos.x + 0.5f; voxelVerts[7] = pos.y + 0.5f; voxelVerts[8] = pos.z + 0.5f;
             voxelVerts[9] = pos.x - 0.5f; voxelVerts[10] = pos.y + 0.5f; voxelVerts[11] = pos.z + 0.5f;
-            faceColor = glm::vec3(1.0f, 0.0f, 0.0f);  // Red for top
-
-            
             break;
         case Face::bottom:
+            //Ensure the bottom face texture is upright by swapping texture coordinates as needed
+
+            texCoords[0] = glm::vec2(textureSize, 0.0f);  // Top-left
+            texCoords[1] = glm::vec2(2 * textureSize, 0.0f);  // Top-right
+            texCoords[2] = glm::vec2(2 * textureSize, 1.0f);  // Bottom-right
+            texCoords[3] = glm::vec2(textureSize, 1.0f);  // Bottom-left
+
             voxelVerts[0] = pos.x - 0.5f; voxelVerts[1] = pos.y - 0.5f; voxelVerts[2] = pos.z - 0.5f;
             voxelVerts[3] = pos.x + 0.5f; voxelVerts[4] = pos.y - 0.5f; voxelVerts[5] = pos.z - 0.5f;
             voxelVerts[6] = pos.x + 0.5f; voxelVerts[7] = pos.y - 0.5f; voxelVerts[8] = pos.z + 0.5f;
             voxelVerts[9] = pos.x - 0.5f; voxelVerts[10] = pos.y - 0.5f; voxelVerts[11] = pos.z + 0.5f;
-            faceColor = glm::vec3(0.0f, 1.0f, 0.0f);  // Green for bottom
-            
             break;
         case Face::right:
+            //Ensure the right face texture is upright by swapping texture coordinates as needed
+            texCoords[0] = glm::vec2(2 * textureSize, 0.0f);  // Top-right
+            texCoords[1] = glm::vec2(2 * textureSize, 1.0f);  // Bottom-right
+            texCoords[2] = glm::vec2(3 * textureSize, 1.0f);  // Bottom-left
+            texCoords[3] = glm::vec2(3 * textureSize, 0.0f);  // Top-left
+
             voxelVerts[0] = pos.x + 0.5f; voxelVerts[1] = pos.y - 0.5f; voxelVerts[2] = pos.z - 0.5f;
             voxelVerts[3] = pos.x + 0.5f; voxelVerts[4] = pos.y + 0.5f; voxelVerts[5] = pos.z - 0.5f;
             voxelVerts[6] = pos.x + 0.5f; voxelVerts[7] = pos.y + 0.5f; voxelVerts[8] = pos.z + 0.5f;
             voxelVerts[9] = pos.x + 0.5f; voxelVerts[10] = pos.y - 0.5f; voxelVerts[11] = pos.z + 0.5f;
-            faceColor = glm::vec3(0.0f, 0.0f, 1.0f);  // Blue for right
-            
             break;
         case Face::left:
+            // Ensure the left face texture is upright by swapping texture coordinates as needed
+            texCoords[0] = glm::vec2(0.0f, 0.0f); // Bottom-left
+            texCoords[1] = glm::vec2(0.0f, 1.0f); // Top-left
+            texCoords[2] = glm::vec2(1.0f, 1.0f); // Top-right
+            texCoords[3] = glm::vec2(1.0f, 0.0f); // Bottom-right
+
             voxelVerts[0] = pos.x - 0.5f; voxelVerts[1] = pos.y - 0.5f; voxelVerts[2] = pos.z - 0.5f;
             voxelVerts[3] = pos.x - 0.5f; voxelVerts[4] = pos.y + 0.5f; voxelVerts[5] = pos.z - 0.5f;
             voxelVerts[6] = pos.x - 0.5f; voxelVerts[7] = pos.y + 0.5f; voxelVerts[8] = pos.z + 0.5f;
             voxelVerts[9] = pos.x - 0.5f; voxelVerts[10] = pos.y - 0.5f; voxelVerts[11] = pos.z + 0.5f;
-            faceColor = glm::vec3(1.0f, 1.0f, 0.0f);  // Yellow for left
-            
             break;
         case Face::front:
+            // Ensure the front face texture is upright by swapping texture coordinates as needed
+            texCoords[0] = glm::vec2(2 * textureSize, 0.0f);  // Top-right
+            texCoords[1] = glm::vec2(2 * textureSize, 1.0f);  // Bottom-right
+            texCoords[2] = glm::vec2(3 * textureSize, 1.0f);  // Bottom-left
+            texCoords[3] = glm::vec2(3 * textureSize, 0.0f);  // Top-left        
+
+
+
             voxelVerts[0] = pos.x - 0.5f; voxelVerts[1] = pos.y - 0.5f; voxelVerts[2] = pos.z + 0.5f;
             voxelVerts[3] = pos.x + 0.5f; voxelVerts[4] = pos.y - 0.5f; voxelVerts[5] = pos.z + 0.5f;
             voxelVerts[6] = pos.x + 0.5f; voxelVerts[7] = pos.y + 0.5f; voxelVerts[8] = pos.z + 0.5f;
             voxelVerts[9] = pos.x - 0.5f; voxelVerts[10] = pos.y + 0.5f; voxelVerts[11] = pos.z + 0.5f;
-            faceColor = glm::vec3(1.0f, 0.0f, 1.0f);  // Magenta for front
-            
             break;
         case Face::back:
+
+            // Ensure the back face texture is upright by swapping texture coordinates as needed
+            texCoords[0] = glm::vec2(1.0f, 0.0f);  // Bottom-left
+            texCoords[1] = glm::vec2(1.0f, 1.0f);  // Top-left
+            texCoords[2] = glm::vec2(2 * textureSize, 1.0f);  // Top-right
+            texCoords[3] = glm::vec2(2 * textureSize, 0.0f);  // Bottom-right
+            
+          
             voxelVerts[0] = pos.x - 0.5f; voxelVerts[1] = pos.y - 0.5f; voxelVerts[2] = pos.z - 0.5f;
             voxelVerts[3] = pos.x + 0.5f; voxelVerts[4] = pos.y - 0.5f; voxelVerts[5] = pos.z - 0.5f;
             voxelVerts[6] = pos.x + 0.5f; voxelVerts[7] = pos.y + 0.5f; voxelVerts[8] = pos.z - 0.5f;
             voxelVerts[9] = pos.x - 0.5f; voxelVerts[10] = pos.y + 0.5f; voxelVerts[11] = pos.z - 0.5f;
-            faceColor = glm::vec3(0.0f, 1.0f, 1.0f);  // Cyan for back
-            
             break;
-
     }
+    // std::cout << "Voxel position: (" << pos.x << ", " << pos.y << ", " << pos.z << ")" << std::endl;
 
-    for (int i = 0; i < 4; i++) {
-        faceColors[i * 3] = faceColor.r;
-        faceColors[i * 3 + 1] = faceColor.g;
-        faceColors[i * 3 + 2] = faceColor.b;
-    }
-
-    colors.insert(colors.end(), std::begin(faceColors), std::end(faceColors)); // Add the face's colors for each vertex
+    // std::cout << "TexCoords: " << texCoords[0].x << ", " << texCoords[0].y << std::endl;
 
 
+    // Store the vertices and texture coordinates
     vertices.insert(vertices.end(), std::begin(voxelVerts), std::end(voxelVerts));
-
-    unsigned int offset = vertices.size() / 3 - 4;
-    for (auto index : voxelIndices){
-        indices.push_back(index + offset);
+    // texCoordsArray.insert(texCoordsArray.end(), std::begin(texCoords), std::end(texCoords));
+    for (int i = 0; i < 4; i++) {
+        texCoordsArray.push_back(texCoords[i].x);  // Add x component (u)
+        texCoordsArray.push_back(texCoords[i].y);  // Add y component (v)
     }
 
     
-
+    // Define the face indices (same for all faces)
+    unsigned int voxelIndices[6] = {0, 1, 2, 2, 3, 0};
+    unsigned int offset = (vertices.size() / 3) - 4;
+    if (offset < 0) {
+        cout << "offset is less than 0" << endl;
+        offset = 0;
+    }    
+    for (auto index : voxelIndices) {
+        indices.push_back(index + offset);
+    }
 }
+
+
+void Chunk::bindTextures() {
+    for (size_t i = 0; i < faceTextures.size(); ++i) {
+        
+        GLuint textureID = textureManager.loadTexture(faceTextures[i]);
+        if (textureID == 0) {
+            std::cerr << "Error: Failed to load texture " << faceTextures[i] << std::endl;
+        }
+        glBindTexture(GL_TEXTURE_2D, textureID);
+    }
+}
+
 
 void Chunk::highlightVoxel(const glm::ivec3& voxel) {
     // Ensure the voxel is within the chunk bounds
@@ -255,18 +328,8 @@ void Chunk::highlightVoxel(const glm::ivec3& voxel) {
 
 bool Chunk::isVoxelSolid(int x, int y, int z) {
     if (x >= 0 && x < sizeX && y >= 0 && y < sizeY && z >= 0 && z < sizeZ) {
-        int worldX = static_cast<int>(position.x) + x;
-        int worldZ = static_cast<int>(position.z) + z;
-
-        // Generate height using noise (adjust the scale and parameters as needed)
-        siv::PerlinNoise perlinNoise(1234);  // Seed for consistency across chunks
-        float noiseValue = perlinNoise.octave2D_01(worldX * 0.02f, worldZ * 0.02f, 4, 0.5f);
-        int height = static_cast<int>(noiseValue * sizeY);
-        // voxels[x][y][z] = (y <= height - 1);
-        // Check if the y position is below or at the generated height or if it's the top layer 
-        // cout << "Checking voxel" << x << y << z << endl;
-        // cout << "voxel is " << voxels[x][y][z] << endl;
-        return voxels[x][y][z];
+       
+        return voxels[x][y][z] != BlockType::Air;
     }
 
     //
@@ -386,32 +449,27 @@ Chunk* Chunk::getBottomNeighbor() {
     }
     return nullptr;
 }
-
-void Chunk::setupMesh(){
+void Chunk::setupMesh() {
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
     glGenBuffers(1, &EBO);
-    glGenBuffers(1, &CBO); // Color buffer
+    glGenBuffers(1, &TBO);  // Texture buffer (No need for CBO anymore)
 
     glBindVertexArray(VAO);
-    
-    // Bind the vertex buffer (positions)
+
+    // Bind vertex buffer (positions)
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
-
-    // Vertex Position Attribute
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    // Bind the color buffer (colors)
-    glBindBuffer(GL_ARRAY_BUFFER, CBO);
-    glBufferData(GL_ARRAY_BUFFER, colors.size() * sizeof(float), colors.data(), GL_STATIC_DRAW);
+    // Bind texture coordinate buffer
+    glBindBuffer(GL_ARRAY_BUFFER, TBO);
+    glBufferData(GL_ARRAY_BUFFER, texCoordsArray.size() * sizeof(float), texCoordsArray.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);  // 2 components for texture coordinates
+    glEnableVertexAttribArray(2);
 
-    // Vertex Color Attribute
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-
-    // Bind the element buffer (indices)
+    // Bind element buffer (indices)
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
 
@@ -419,15 +477,16 @@ void Chunk::setupMesh(){
     glBindVertexArray(0);
 }
 
+
 void Chunk::randomlyRemoveVoxels(){
     int x = rand() % sizeX;
     
     int z = rand() % sizeZ;
     // y height should be from surface, so we start from the top
     for (int y = sizeY - 1; y >= 0; --y) {
-        if (voxels[x][y][z]) {
+        if (voxels[x][y][z] != BlockType::Air) {
             // Remove this voxel
-            voxels[x][y][z] = false;
+            voxels[x][y][z] = BlockType::Air;
             std::cout << "Removing voxel at " << x << ", " << y << ", " << z << std::endl;
 
             // Regenerate chunk to reflect the change
@@ -439,27 +498,44 @@ void Chunk::randomlyRemoveVoxels(){
 }
 
 
+
 void Chunk::render(GLuint shaderProgram, const glm::mat4& view, const glm::mat4& projection) {
     glUseProgram(shaderProgram);
+    CHECK_GL_ERROR();
 
     glm::mat4 model = glm::translate(glm::mat4(1.0f), position);
 
-
-    
+    // Set the uniform matrices (model, view, projection)
     int modelLoc = glGetUniformLocation(shaderProgram, "model");
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+    CHECK_GL_ERROR();
 
     int viewLoc = glGetUniformLocation(shaderProgram, "view");
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+    CHECK_GL_ERROR();
 
     int projLoc = glGetUniformLocation(shaderProgram, "projection");
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-
-    
-
-
+    CHECK_GL_ERROR();
 
     glBindVertexArray(VAO);
+    CHECK_GL_ERROR();
+
+    // Bind the entire texture atlas
+    GLuint textureID = textureManager.loadTexture("pics/spritesheet.png");
+    if (textureID == 0) {
+        std::cerr << "Error: Failed to load texture atlas" << std::endl;
+    }
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+    CHECK_GL_ERROR();  // Check if there's an OpenGL error after binding the texture.
+    glUniform1i(glGetUniformLocation(shaderProgram, "blockTexture"), 0);  // Set the atlas to the shader
+    CHECK_GL_ERROR();
+
+    // Draw all elements at once using the already set UV coordinates
     glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+    CHECK_GL_ERROR();
+
     glBindVertexArray(0);
+    CHECK_GL_ERROR();
 }

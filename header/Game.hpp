@@ -9,6 +9,7 @@
 #include <functional>   // For std::hash
 #include "ShaderLoader.hpp"
 #include "ThreadPool.hpp"
+#include "TexureManager.hpp"
 class Chunk;
 
 
@@ -27,6 +28,8 @@ public:
     ~Game();
     GLuint shaderProgram; 
     ShaderLoader* shaderLoader;
+    TextureManager* textureManager;
+    GLuint textureID;
     bool raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, Chunk& chunk, glm::ivec3& hitVoxel, float maxDistance);
     void drawRay(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, float length);
 

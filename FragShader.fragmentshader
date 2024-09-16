@@ -2,25 +2,33 @@
 
 out vec4 FragColor;
 
-in vec3 FragPos;  // From vertex shader
-in vec3 Normal;   // From vertex shader
+in vec3 FragPos;   // From vertex shader
+in vec3 Normal;    // From vertex shader
+in vec2 TexCoords; // Texture coordinates from vertex shader
 
 // Lighting parameters
-uniform vec3 lightDir;  // Direction of the light
-uniform vec3 lightColor;  // Light color
-uniform vec3 ambientColor;  // Ambient light color
-uniform vec3 objectColor;  // Color of the voxel
+uniform vec3 lightDir;        // Direction of the light
+uniform vec3 lightColor;      // Light color
+uniform vec3 ambientColor;    // Ambient light color
+
+// Textures
+uniform sampler2D blockTexture; // Block texture (atlas)
+
 
 void main() {
-    // Ambient lighting
-    vec3 ambient = 0.1 * ambientColor;
+    // Ambient lighting (adjusted to 0.3 for softer ambient light)
+    vec3 ambient = 0.3 * ambientColor;
 
     // Directional lighting
     vec3 norm = normalize(Normal);
     float diff = max(dot(norm, -lightDir), 0.0);
     vec3 diffuse = diff * lightColor;
 
-    // Final color
+    // Sample the texture color from the atlas
+    vec3 objectColor = texture(blockTexture, TexCoords).rgb;
+
+    // Final color (combined lighting and texture)
     vec3 result = (ambient + diffuse) * objectColor;
+    
     FragColor = vec4(result, 1.0);
 }

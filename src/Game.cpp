@@ -33,6 +33,7 @@ float lastY = 0.0f;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 ThreadPool threadPool(8);
+TextureManager *textureManager = new TextureManager();
 
 
 std::deque<Chunk*> chunksToAdd;
@@ -123,7 +124,7 @@ bool Game::raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, Ch
         // Check if the current voxel is solid
         if (chunk.isVoxelSolid(currentVoxel.x, currentVoxel.y, currentVoxel.z)) {
             hitVoxel = currentVoxel;  // Record the hit voxel
-            chunk.voxels[currentVoxel.x][currentVoxel.y][currentVoxel.z] = false;  // Remove the voxel
+            chunk.voxels[currentVoxel.x][currentVoxel.y][currentVoxel.z] = BlockType::Air;  // Remove the voxel
             chunk.generateChunk();  // Regenerate the chunk
             chunk.setupMesh();  // Setup the mesh
             cout << "we hit a solid voxel" << endl;
@@ -241,7 +242,9 @@ void Game::Init() {
     // chunk = new Chunk(16,16,16, glm::vec3(0.0f, 0.0f, 0.0f) , this); ;
     camera = new Camera();
     shaderProgram = shaderLoader->loadShaders("VertShader.vertexshader", "FragShader.fragmentshader");    
-   
+    this->textureManager = new TextureManager();
+    this->textureID = textureManager->loadTexture("pics/spritesheet.png");
+    cout << "Texture ID: " << textureID << endl;
 }
 void Game::drawRay(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, float length) {
     glm::vec3 rayEnd = rayOrigin + rayDirection * length;
@@ -293,7 +296,7 @@ void Game::UpdateChunks() {
                 chunksInQueue.insert(chunkPos); // Mark chunk as enqueued
                 
                 threadPool.enqueueTask([this, chunkPos, x, z]() {
-                    Chunk* newChunk = new Chunk(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE, glm::vec3(x * CHUNK_SIZE, 0.0f, z * CHUNK_SIZE), this, shaderProgram);
+                    Chunk* newChunk = new Chunk(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE, glm::vec3(x * CHUNK_SIZE, 0.0f, z * CHUNK_SIZE), this, shaderProgram, *textureManager);
                     
                     std::lock_guard<std::mutex> lock(chunkMutex);
                     chunksToAdd.push_back(newChunk);
@@ -307,7 +310,6 @@ void Game::UpdateChunks() {
     std::lock_guard<std::mutex> lock(chunkMutex);
     while (!chunksToAdd.empty()) {
 
-        // std::lock_guard<std::mutex> lock(chunkMutex);
 
         Chunk* newChunk = chunksToAdd.front();
         chunksToAdd.pop_front();
@@ -344,85 +346,54 @@ bool Game::castRayForVoxel(const glm::vec3& rayOrigin, const glm::vec3& rayDirec
     }
     
 }
-
 void Game::Render() {
-    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // Add this line
+    // Enable wireframe mode for debugging (if needed)
+    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); 
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    //set color to sky blue
+    
+    // Set the sky color to light sky blue
     glClearColor(0.53f, 0.81f, 0.98f, 1.0f);
-    glm::vec3 lightDir = glm::normalize(glm::vec3(-0.2f, -1.0f, -0.3f));  // Direction of light
-    glm::vec3 lightColor = glm::vec3(1.0f, -1.0f, 1.0f);  // White light
+
+    // Set up lighting and ambient colors
+    glm::vec3 lightDir = glm::normalize(glm::vec3(-0.2f, -1.0f, -0.3f));  // Direction of the light
+    glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f);  // White light (corrected)
     glm::vec3 ambientColor = glm::vec3(0.53f, 0.81f, 0.98f);  // Light sky blue as ambient
-    glm::vec3 objectColor = glm::vec3(0.7f, 0.3f, 0.3f);  // Example color for voxels (reddish)
 
     glUseProgram(shaderProgram);
 
-    // Pass the light information to the shader
+    // Pass light information to the shader
     GLuint lightDirLoc = glGetUniformLocation(shaderProgram, "lightDir");
     GLuint lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
     GLuint ambientColorLoc = glGetUniformLocation(shaderProgram, "ambientColor");
-    GLuint objectColorLoc = glGetUniformLocation(shaderProgram, "objectColor");
 
     glUniform3fv(lightDirLoc, 1, glm::value_ptr(lightDir));
     glUniform3fv(lightColorLoc, 1, glm::value_ptr(lightColor));
     glUniform3fv(ambientColorLoc, 1, glm::value_ptr(ambientColor));
-    glUniform3fv(objectColorLoc, 1, glm::value_ptr(objectColor));
-    
 
-    
-    
-    //change the view matrix to the camera view matrix
 
+
+    // Bind the texture atlas once (assuming you have the texture atlas loaded in texture unit 0)
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, textureManager->loadTexture("pics/spritesheet.png"));
+    GLint textureUniformLoc = glGetUniformLocation(shaderProgram, "blockTexture");
+    glUniform1i(textureUniformLoc, 0);  // Texture unit 0
+
+    // Update the view matrix from the camera
     glm::mat4 view = camera->getViewMatrix();
-
-    // glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -3.0f));
-    // rotation += 0.01f;
-    // view = glm::rotate(view, rotation, glm::vec3(0.5f, 1.0f, 0.0f));
     
+    // Set the projection matrix for 3D perspective
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 100.0f);
-    // chunk->render(view, projection);
+
+    // Render all chunks
     for (const auto& chunkPair : loadedChunks) {
-        // cout << "Rendering chunk at " << chunkPair.first.first << " " << chunkPair.first.second << endl;
         chunkPair.second->render(shaderProgram, view, projection);
     }
 
-    // Render the ray
-
-        // glUseProgram(camera->shaderProgram);
-        // view = camera->getViewMatrix();
-        // projection = glm::perspective(glm::radians(45.0f), (float)800 / (float)600, 0.1f, 100.0f);
-        // GLuint viewLoc = glGetUniformLocation(camera->shaderProgram, "view");
-        // GLuint projectionLoc = glGetUniformLocation(camera->shaderProgram, "projection");
-        // GLuint colorLoc = glGetUniformLocation(camera->shaderProgram, "objectColor");
-
-        // if (viewLoc == -1) {
-        //     std::cout << "Error: View location not found." << std::endl;
-        // }
-
-        // if (projectionLoc == -1) {
-        //     std::cout << "Error: Projection location not found." << std::endl;
-        // }
-
-        // if (colorLoc == -1) {
-        //     std::cout << "Error: Color location not found." << std::endl;
-        // }
-        
-        // glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-        // glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
-        // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);  // Set to line mode
-        // camera->render(camera->shaderProgram, 50.0f);
-        // glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);  // Revert back to fill mode
-
-        // GLenum error = glGetError();
-        // if (error != GL_NO_ERROR) {
-        //     std::cout << "OpenGL Error: " << error << std::endl;
-        // }
-   
-
-
+    // Swap buffers to display the rendered frame
     glfwSwapBuffers(window);
 }
+
 
 
 
