@@ -26,6 +26,15 @@ enum Face {
     bottom
 };
 
+std::ostream& operator<<(std::ostream& os, const BlockType& blockType) {
+    switch (blockType) {
+        case BlockType::Air: os << "Air"; break;
+        // handle other block types...
+        default: os << "Unknown block type"; break;
+    }
+    return os;
+}
+
 
 class Chunk {
 public:
@@ -36,6 +45,7 @@ public:
     void render(GLuint shaderProgram, const glm::mat4& view, const glm::mat4& projection);
     void generateChunk();
     void initChunk();
+    std::vector<int> tintFlagsArray;
     int sizeX, sizeY, sizeZ;
     std::vector<std::string> faceTextures;
     glm::vec3 position;

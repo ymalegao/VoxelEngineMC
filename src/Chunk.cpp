@@ -108,7 +108,7 @@ void Chunk::initChunk() {
                 float noiseValue3D = perlinNoise.octave3D_01(worldX * 0.1f, worldY * 0.1f, worldZ * 0.1f, 4, 0.5f);
                 
                 // Caves: Create caves based on 3D noise value
-                if (y == surfaceHeight) {
+                if (y == surfaceHeight - 1) {
                     // The topmost block is grass
                     voxels[x][y][z] = BlockType::Grass;
                 } else if (y < surfaceHeight && y >= surfaceHeight - 3) {
@@ -175,45 +175,50 @@ void Chunk::addFace(const glm::vec3& pos, Face face) {
     BlockType blockType = voxels[pos.x][pos.y][pos.z];
     glm::vec2 texCoords[4];
     // Texture atlas size - 160x160 pixels- each row has 16x16 pixel textures
-    float textureSize = 16.0f / 256.0f;
-    if (blockType == BlockType::Grass) {
+    float textureSize = 16.0f / 256.0f;  // Each sprite is 16x16 in a 256x256 texture atlas
+
+    int spriteX = 0;  // The x coordinate of the sprite in the texture grid
+    int spriteY = 0;  // The y coordinate of the sprite in the texture grid
+
+     if (blockType == BlockType::Grass) {
         if (face == Face::top) {
-            // Grass top texture (2nd block in the first row)
-            texCoords[0] = glm::vec2(1 * textureSize, 1.0f);            // Bottom-left
-            texCoords[1] = glm::vec2(2 * textureSize, 1.0f);            // Bottom-right
-            texCoords[2] = glm::vec2(2 * textureSize, 1.0f - textureSize);  // Top-right
-            texCoords[3] = glm::vec2(1 * textureSize, 1.0f - textureSize);  // Top-left
-        } else if (face == Face::left || face == Face::right || face == Face::front || face == Face::back) {
-            // Grass side texture (4th block in the first row)
-            texCoords[0] = glm::vec2(3 * textureSize, 1.0f);            // Bottom-left
-            texCoords[1] = glm::vec2(4 * textureSize, 1.0f);            // Bottom-right
-            texCoords[2] = glm::vec2(4 * textureSize, 1.0f - textureSize);  // Top-right
-            texCoords[3] = glm::vec2(3 * textureSize, 1.0f - textureSize);  // Top-left
+            spriteX = 0;  // Grass top
+            spriteY = 0;  // First row
         } else if (face == Face::bottom) {
-            // Dirt block for the bottom (3rd block in the first row)
-            texCoords[0] = glm::vec2(2 * textureSize, 1.0f);            // Bottom-left
-            texCoords[1] = glm::vec2(3 * textureSize, 1.0f);            // Bottom-right
-            texCoords[2] = glm::vec2(3 * textureSize, 1.0f - textureSize);  // Top-right
-            texCoords[3] = glm::vec2(2 * textureSize, 1.0f - textureSize);  // Top-left
+            spriteX = 2;  // Dirt block for the bottom
+            spriteY = 0;  // First row
+        } else if (face == Face::left || face == Face::right || face == Face::front || face == Face::back) {
+            spriteX = 3;  // Grass side texture (fourth block in first row)
+            spriteY = 0;  // First row
         }
     } else if (blockType == BlockType::Stone) {
-        // Stone texture (1st block in the first row)
-        texCoords[0] = glm::vec2(0 * textureSize, 1.0f);                // Bottom-left
-        texCoords[1] = glm::vec2(1 * textureSize, 1.0f);                // Bottom-right
-        texCoords[2] = glm::vec2(1 * textureSize, 1.0f - textureSize);      // Top-right
-        texCoords[3] = glm::vec2(0 * textureSize, 1.0f - textureSize);      // Top-left
+        spriteX = 1;  // Stone block
+        spriteY = 0;  // First row
     } else if (blockType == BlockType::Dirt) {
-        // Dirt texture (3rd block in the first row)
-        texCoords[0] = glm::vec2(2 * textureSize, 1.0f);                // Bottom-left
-        texCoords[1] = glm::vec2(3 * textureSize, 1.0f);                // Bottom-right
-        texCoords[2] = glm::vec2(3 * textureSize, 1.0f - textureSize);      // Top-right
-        texCoords[3] = glm::vec2(2 * textureSize, 1.0f - textureSize);      // Top-left
+        spriteX = 2;  // Dirt block
+        spriteY = 0;  // First row
     }
-    // Calculate the texture coordinates based on the sprite position
-   
+
+    // Calculate the top-left and bottom-right texture coordinates
+    glm::vec2 topLeft = glm::vec2(spriteX * textureSize, 1.0f - (spriteY + 1) * textureSize);
+    glm::vec2 bottomRight = glm::vec2((spriteX + 1) * textureSize, 1.0f - spriteY * textureSize);
+
+    if (face == Face::top || face == Face::bottom) {
+    texCoords[0] = glm::vec2(topLeft.x, bottomRight.y);      // Bottom-left
+    texCoords[1] = glm::vec2(bottomRight.x, bottomRight.y);  // Bottom-right
+    texCoords[2] = glm::vec2(bottomRight.x, topLeft.y);      // Top-right
+    texCoords[3] = glm::vec2(topLeft.x, topLeft.y);          // Top-left
+    }
+    // For the other faces, the vertices are defined in the order: bottom-left, top-left, top-right, bottom-right
+    // So, we need to adjust the texture coordinates for these faces
+    else {
+        texCoords[0] = glm::vec2(topLeft.x, bottomRight.y);      // Bottom-left
+        texCoords[1] = glm::vec2(topLeft.x, topLeft.y);          // Top-left
+        texCoords[2] = glm::vec2(bottomRight.x, topLeft.y);      // Top-right
+        texCoords[3] = glm::vec2(bottomRight.x, bottomRight.y);  // Bottom-right
+    }
 
 
-    // Calculate the texture coordinates
     float voxelVerts[12];
     switch (face) {
         case Face::top:
@@ -272,7 +277,7 @@ void Chunk::addFace(const glm::vec3& pos, Face face) {
 
     // std::cout << "TexCoords: " << texCoords[0].x << ", " << texCoords[0].y << std::endl;
 
-
+    
     // Store the vertices and texture coordinates
     vertices.insert(vertices.end(), std::begin(voxelVerts), std::end(voxelVerts));
     // texCoordsArray.insert(texCoordsArray.end(), std::begin(texCoords), std::end(texCoords));
@@ -280,6 +285,7 @@ void Chunk::addFace(const glm::vec3& pos, Face face) {
         texCoordsArray.push_back(texCoords[i].x);  // Add x component (u)
         texCoordsArray.push_back(texCoords[i].y);  // Add y component (v)
     }
+    
 
     
     // Define the face indices (same for all faces)
@@ -330,7 +336,8 @@ void Chunk::highlightVoxel(const glm::ivec3& voxel) {
 
 bool Chunk::isVoxelSolid(int x, int y, int z) {
     if (x >= 0 && x < sizeX && y >= 0 && y < sizeY && z >= 0 && z < sizeZ) {
-       
+        //print the voxel type
+        cout << "Voxel type: " << voxels[x][y][z] << endl;
         return voxels[x][y][z] != BlockType::Air;
     }
 
@@ -471,6 +478,7 @@ void Chunk::setupMesh() {
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);  // 2 components for texture coordinates
     glEnableVertexAttribArray(2);
 
+    
     // Bind element buffer (indices)
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
@@ -528,8 +536,13 @@ void Chunk::render(GLuint shaderProgram, const glm::mat4& view, const glm::mat4&
     if (textureID == 0) {
         std::cerr << "Error: Failed to load texture atlas" << std::endl;
     }
+    
     glActiveTexture(GL_TEXTURE0);
+    
     glBindTexture(GL_TEXTURE_2D, textureID);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
     CHECK_GL_ERROR();  // Check if there's an OpenGL error after binding the texture.
     glUniform1i(glGetUniformLocation(shaderProgram, "blockTexture"), 0);  // Set the atlas to the shader
     CHECK_GL_ERROR();
