@@ -1,3 +1,4 @@
+#pragma once
 #ifndef CHUNK_HPP
 #define CHUNK_HPP
 
@@ -26,14 +27,7 @@ enum Face {
     bottom
 };
 
-std::ostream& operator<<(std::ostream& os, const BlockType& blockType) {
-    switch (blockType) {
-        case BlockType::Air: os << "Air"; break;
-        // handle other block types...
-        default: os << "Unknown block type"; break;
-    }
-    return os;
-}
+
 
 
 class Chunk {

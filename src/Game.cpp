@@ -120,6 +120,8 @@ bool Game::raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, Ch
     while (distance < maxDistance) {
         // Debug the current ray position
         std::cout << "Raycasting at voxel: (" << currentVoxel.x << ", " << currentVoxel.y << ", " << currentVoxel.z << ")" << std::endl;
+        
+        
 
         // Check if the current voxel is solid
         if (chunk.isVoxelSolid(currentVoxel.x, currentVoxel.y, currentVoxel.z)) {

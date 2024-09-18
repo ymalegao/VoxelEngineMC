@@ -108,7 +108,7 @@ void Chunk::initChunk() {
                 float noiseValue3D = perlinNoise.octave3D_01(worldX * 0.1f, worldY * 0.1f, worldZ * 0.1f, 4, 0.5f);
                 
                 // Caves: Create caves based on 3D noise value
-                if (y == surfaceHeight - 1) {
+                if (y == surfaceHeight && y >= sizeY / 2) {
                     // The topmost block is grass
                     voxels[x][y][z] = BlockType::Grass;
                 } else if (y < surfaceHeight && y >= surfaceHeight - 3) {
@@ -170,131 +170,140 @@ void Chunk::generateChunk(){
         }
     }
 }
-
 void Chunk::addFace(const glm::vec3& pos, Face face) {
     BlockType blockType = voxels[pos.x][pos.y][pos.z];
     glm::vec2 texCoords[4];
-    // Texture atlas size - 160x160 pixels- each row has 16x16 pixel textures
     float textureSize = 16.0f / 256.0f;  // Each sprite is 16x16 in a 256x256 texture atlas
 
-    int spriteX = 0;  // The x coordinate of the sprite in the texture grid
-    int spriteY = 0;  // The y coordinate of the sprite in the texture grid
+    int spriteX = 0;  // Default to grass top
+    int spriteY = 0;
 
-     if (blockType == BlockType::Grass) {
+    // Special case: Grass block has different textures on different faces
+    if (blockType == BlockType::Grass) {
         if (face == Face::top) {
-            spriteX = 0;  // Grass top
-            spriteY = 0;  // First row
+            spriteX = 0;  // Grass top texture
+            spriteY = 0;
         } else if (face == Face::bottom) {
-            spriteX = 2;  // Dirt block for the bottom
-            spriteY = 0;  // First row
+            spriteX = 2;  // Dirt texture for bottom
+            spriteY = 0;
         } else if (face == Face::left || face == Face::right || face == Face::front || face == Face::back) {
-            spriteX = 3;  // Grass side texture (fourth block in first row)
-            spriteY = 0;  // First row
+            spriteX = 3;  // Grass side texture
+            spriteY = 0;
         }
-    } else if (blockType == BlockType::Stone) {
-        spriteX = 1;  // Stone block
-        spriteY = 0;  // First row
-    } else if (blockType == BlockType::Dirt) {
-        spriteX = 2;  // Dirt block
-        spriteY = 0;  // First row
+    }
+    if (blockType == BlockType::Dirt) {
+        spriteX = 2;  // Dirt texture
+        spriteY = 0;
+    }
+    if (blockType == BlockType::Stone) {
+        spriteX = 1;  // Stone texture
+        spriteY = 0;
     }
 
-    // Calculate the top-left and bottom-right texture coordinates
-    glm::vec2 topLeft = glm::vec2(spriteX * textureSize, 1.0f - (spriteY + 1) * textureSize);
-    glm::vec2 bottomRight = glm::vec2((spriteX + 1) * textureSize, 1.0f - spriteY * textureSize);
+    float u0 = spriteX * textureSize;
+    float v0 = spriteY * textureSize;
+    float u1 = (spriteX + 1) * textureSize;
+    float v1 = (spriteY + 1) * textureSize;
 
-    if (face == Face::top || face == Face::bottom) {
-    texCoords[0] = glm::vec2(topLeft.x, bottomRight.y);      // Bottom-left
-    texCoords[1] = glm::vec2(bottomRight.x, bottomRight.y);  // Bottom-right
-    texCoords[2] = glm::vec2(bottomRight.x, topLeft.y);      // Top-right
-    texCoords[3] = glm::vec2(topLeft.x, topLeft.y);          // Top-left
-    }
-    // For the other faces, the vertices are defined in the order: bottom-left, top-left, top-right, bottom-right
-    // So, we need to adjust the texture coordinates for these faces
-    else {
-        texCoords[0] = glm::vec2(topLeft.x, bottomRight.y);      // Bottom-left
-        texCoords[1] = glm::vec2(topLeft.x, topLeft.y);          // Top-left
-        texCoords[2] = glm::vec2(bottomRight.x, topLeft.y);      // Top-right
-        texCoords[3] = glm::vec2(bottomRight.x, bottomRight.y);  // Bottom-right
-    }
+    v0 = 1.0f - v0;
+    v1 = 1.0f - v1;
 
+    // Calculate texture coordinates
+    glm::vec2 bottomLeft = glm::vec2(spriteX * textureSize, spriteY * textureSize);
+    glm::vec2 topRight = glm::vec2((spriteX + 1) * textureSize, (spriteY + 1) * textureSize);
 
+    // Explicitly set vertices and texture coordinates for each face
     float voxelVerts[12];
     switch (face) {
         case Face::top:
+            // Set UV and vertex positions for the top face
+            texCoords[0] = glm::vec2(u0, v1); // 0
+            texCoords[1] = glm::vec2(u1, v1); // 1
+            texCoords[2] = glm::vec2(u1, v0); // 2
+            texCoords[3] = glm::vec2(u0, v0); // 3
+
             voxelVerts[0] = pos.x - 0.5f; voxelVerts[1] = pos.y + 0.5f; voxelVerts[2] = pos.z - 0.5f;
             voxelVerts[3] = pos.x + 0.5f; voxelVerts[4] = pos.y + 0.5f; voxelVerts[5] = pos.z - 0.5f;
             voxelVerts[6] = pos.x + 0.5f; voxelVerts[7] = pos.y + 0.5f; voxelVerts[8] = pos.z + 0.5f;
             voxelVerts[9] = pos.x - 0.5f; voxelVerts[10] = pos.y + 0.5f; voxelVerts[11] = pos.z + 0.5f;
             break;
-        case Face::bottom:
-            //Ensure the bottom face texture is upright by swapping texture coordinates as needed
 
-           
+        case Face::bottom:
+            // Set UV and vertex positions for the bottom face
+            texCoords[0] = glm::vec2(u0, v1); // 0
+            texCoords[1] = glm::vec2(u1, v1); // 1
+            texCoords[2] = glm::vec2(u1, v0); // 2
+            texCoords[3] = glm::vec2(u0, v0); // 3
+
             voxelVerts[0] = pos.x - 0.5f; voxelVerts[1] = pos.y - 0.5f; voxelVerts[2] = pos.z - 0.5f;
             voxelVerts[3] = pos.x + 0.5f; voxelVerts[4] = pos.y - 0.5f; voxelVerts[5] = pos.z - 0.5f;
             voxelVerts[6] = pos.x + 0.5f; voxelVerts[7] = pos.y - 0.5f; voxelVerts[8] = pos.z + 0.5f;
             voxelVerts[9] = pos.x - 0.5f; voxelVerts[10] = pos.y - 0.5f; voxelVerts[11] = pos.z + 0.5f;
             break;
+
         case Face::right:
-            //Ensure the right face texture is upright by swapping texture coordinates as needed
-           
+            // Set UV and vertex positions for the right face
+            texCoords[0] = glm::vec2(u1, v1); // 0
+            texCoords[1] = glm::vec2(u1, v0); // 1
+            texCoords[2] = glm::vec2(u0, v0); // 2
+            texCoords[3] = glm::vec2(u0, v1); // 3
+
             voxelVerts[0] = pos.x + 0.5f; voxelVerts[1] = pos.y - 0.5f; voxelVerts[2] = pos.z - 0.5f;
             voxelVerts[3] = pos.x + 0.5f; voxelVerts[4] = pos.y + 0.5f; voxelVerts[5] = pos.z - 0.5f;
             voxelVerts[6] = pos.x + 0.5f; voxelVerts[7] = pos.y + 0.5f; voxelVerts[8] = pos.z + 0.5f;
             voxelVerts[9] = pos.x + 0.5f; voxelVerts[10] = pos.y - 0.5f; voxelVerts[11] = pos.z + 0.5f;
             break;
+
         case Face::left:
-            // Ensure the left face texture is upright by swapping texture coordinates as needed
-          
+            // Set UV and vertex positions for the left face
+            texCoords[0] = glm::vec2(u0, v1); // 0
+            texCoords[1] = glm::vec2(u0, v0); // 1
+            texCoords[2] = glm::vec2(u1, v0); // 2
+            texCoords[3] = glm::vec2(u1, v1); // 3
+
             voxelVerts[0] = pos.x - 0.5f; voxelVerts[1] = pos.y - 0.5f; voxelVerts[2] = pos.z - 0.5f;
             voxelVerts[3] = pos.x - 0.5f; voxelVerts[4] = pos.y + 0.5f; voxelVerts[5] = pos.z - 0.5f;
             voxelVerts[6] = pos.x - 0.5f; voxelVerts[7] = pos.y + 0.5f; voxelVerts[8] = pos.z + 0.5f;
             voxelVerts[9] = pos.x - 0.5f; voxelVerts[10] = pos.y - 0.5f; voxelVerts[11] = pos.z + 0.5f;
             break;
-        case Face::front:
-            // Ensure the front face texture is upright by swapping texture coordinates as needed
-           
 
+        case Face::front:
+            // Set UV and vertex positions for the front face
+            texCoords[0] = glm::vec2(u1, v1); // 0
+            texCoords[1] = glm::vec2(u0, v1); // 1
+            texCoords[2] = glm::vec2(u0, v0); // 2
+            texCoords[3] = glm::vec2(u1, v0); // 3
 
             voxelVerts[0] = pos.x - 0.5f; voxelVerts[1] = pos.y - 0.5f; voxelVerts[2] = pos.z + 0.5f;
             voxelVerts[3] = pos.x + 0.5f; voxelVerts[4] = pos.y - 0.5f; voxelVerts[5] = pos.z + 0.5f;
             voxelVerts[6] = pos.x + 0.5f; voxelVerts[7] = pos.y + 0.5f; voxelVerts[8] = pos.z + 0.5f;
             voxelVerts[9] = pos.x - 0.5f; voxelVerts[10] = pos.y + 0.5f; voxelVerts[11] = pos.z + 0.5f;
             break;
-        case Face::back:
 
-            // Ensure the back face texture is upright by swapping texture coordinates as needed
-          
-          
+        case Face::back:
+            // Set UV and vertex positions for the back face
+            texCoords[0] = glm::vec2(u0, v1); // 0
+            texCoords[1] = glm::vec2(u1, v1); // 1
+            texCoords[2] = glm::vec2(u1, v0); // 2
+            texCoords[3] = glm::vec2(u0, v0); // 3
+
             voxelVerts[0] = pos.x - 0.5f; voxelVerts[1] = pos.y - 0.5f; voxelVerts[2] = pos.z - 0.5f;
             voxelVerts[3] = pos.x + 0.5f; voxelVerts[4] = pos.y - 0.5f; voxelVerts[5] = pos.z - 0.5f;
             voxelVerts[6] = pos.x + 0.5f; voxelVerts[7] = pos.y + 0.5f; voxelVerts[8] = pos.z - 0.5f;
             voxelVerts[9] = pos.x - 0.5f; voxelVerts[10] = pos.y + 0.5f; voxelVerts[11] = pos.z - 0.5f;
             break;
     }
-    // std::cout << "Voxel position: (" << pos.x << ", " << pos.y << ", " << pos.z << ")" << std::endl;
 
-    // std::cout << "TexCoords: " << texCoords[0].x << ", " << texCoords[0].y << std::endl;
-
-    
-    // Store the vertices and texture coordinates
+    // Store vertices and texture coordinates for the face
     vertices.insert(vertices.end(), std::begin(voxelVerts), std::end(voxelVerts));
-    // texCoordsArray.insert(texCoordsArray.end(), std::begin(texCoords), std::end(texCoords));
     for (int i = 0; i < 4; i++) {
-        texCoordsArray.push_back(texCoords[i].x);  // Add x component (u)
-        texCoordsArray.push_back(texCoords[i].y);  // Add y component (v)
+        texCoordsArray.push_back(texCoords[i].x);  // Add u component
+        texCoordsArray.push_back(texCoords[i].y);  // Add v component
     }
-    
 
-    
-    // Define the face indices (same for all faces)
+    // Define the face indices
     unsigned int voxelIndices[6] = {0, 1, 2, 2, 3, 0};
     unsigned int offset = (vertices.size() / 3) - 4;
-    if (offset < 0) {
-        cout << "offset is less than 0" << endl;
-        offset = 0;
-    }    
     for (auto index : voxelIndices) {
         indices.push_back(index + offset);
     }
@@ -337,7 +346,7 @@ void Chunk::highlightVoxel(const glm::ivec3& voxel) {
 bool Chunk::isVoxelSolid(int x, int y, int z) {
     if (x >= 0 && x < sizeX && y >= 0 && y < sizeY && z >= 0 && z < sizeZ) {
         //print the voxel type
-        cout << "Voxel type: " << voxels[x][y][z] << endl;
+        
         return voxels[x][y][z] != BlockType::Air;
     }
 
@@ -384,7 +393,7 @@ bool Chunk::isVoxelSolid(int x, int y, int z) {
     }
 
     // If no neighboring chunk exists, assume non-solid (empty space)
-    return true;
+    return false;
 }
 
 Chunk* Chunk::getLeftNeighbor() {
