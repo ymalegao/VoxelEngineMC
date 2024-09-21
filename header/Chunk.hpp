@@ -9,6 +9,9 @@
 #include "Game.hpp"
 #include "PerlinNoise.hpp"
 #include "TexureManager.hpp"
+#include "BlockType.hpp"
+#include "Biome.hpp"
+
 
 
 
@@ -16,16 +19,14 @@ class Game;
 
 
 
-enum class BlockType { Air, Grass, Stone, Dirt };
-
-enum Face {
-    front,
-    back,
-    left,
-    right,
-    top,
-    bottom
-};
+// enum Face {
+//     front,
+//     back,
+//     left,
+//     right,
+//     top,
+//     bottom
+// };
 
 
 
@@ -48,7 +49,7 @@ public:
     void bindTextures();
     void highlightVoxel(const glm::ivec3& voxel);
     void loadShaders(const std::string& vertexPath, const std::string& fragmentPath);
-
+    void placeTree(int x, int y, int z);
 
     bool isVoxelSolid(int x, int y, int z) ;
     std::vector<std::vector<std::vector<BlockType>>> voxels;

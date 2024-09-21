@@ -88,43 +88,88 @@ void Chunk::loadShaders(const std::string& vertexPath, const std::string& fragme
 
     // cout << "Loaded shaders" << endl;
 }
-
-
 void Chunk::initChunk() {
-    siv::PerlinNoise perlinNoise(1234);
+    unsigned int seed = 1234;  // Use a consistent seed
+    siv::PerlinNoise perlinNoise(seed);
+    int maxHeight = sizeY*0.5;
+
     for (int x = 0; x < sizeX; x++) {
         for (int z = 0; z < sizeZ; z++) {
             int worldX = static_cast<int>(position.x) + x;
             int worldZ = static_cast<int>(position.z) + z;
 
-            // 2D noise for surface height
-            float noiseValue2D = perlinNoise.octave2D_01(worldX * 0.02f, worldZ * 0.02f, 4, 0.5f);
-            int surfaceHeight = static_cast<int>(noiseValue2D * sizeY);
+            // Biome noise calculation
+            float biomeFrequency = 0.02f;
+            float biomeAmplitude = 1.0f;
+            float biomePersistence = 0.5f;
+            int biomeOctaves = 4;
+            float biomeNoise = 0.0f;
+            float maxBiomeAmplitude = 0.0f;
+            float currentBiomeFrequency = biomeFrequency;
+            float currentBiomeAmplitude = biomeAmplitude;
 
+            for (int i = 0; i < biomeOctaves; i++) {
+                biomeNoise += perlinNoise.noise2D_01(worldX * currentBiomeFrequency, worldZ * currentBiomeFrequency) * currentBiomeAmplitude;
+                maxBiomeAmplitude += currentBiomeAmplitude;
+                currentBiomeAmplitude *= biomePersistence;
+                currentBiomeFrequency *= 2.0f;
+            }
+
+            biomeNoise /= maxBiomeAmplitude; // Normalize to [0, 1]
+            biomeNoise = biomeNoise * 2.0f - 1.0f; // Map to [-1, 1]
+
+            BiomeType biome = determineBiome(biomeNoise);
+            BiomeProperties properties = biomeProperties[biome];
+
+            // Terrain height calculation
+            float frequency = 0.01f;
+            float amplitude = 80.0f * properties.terrainRoughness;  // Increased amplitude
+            float terrainNoise = 0.0f;
+            float persistence = 0.5f;
+            int octaves = 4;
+
+            float currentAmplitude = amplitude;
+            float currentFrequency = frequency;
+
+            for (int i = 0; i < octaves; i++) {
+                terrainNoise += perlinNoise.noise2D_01(worldX * currentFrequency, worldZ * currentFrequency) * currentAmplitude;
+                currentAmplitude *= persistence;
+                currentFrequency *= 2.0f;
+            }
+
+            terrainNoise = glm::clamp(terrainNoise, 0.0f, (float)(maxHeight - 1));
+            int surfaceHeight = static_cast<int>(terrainNoise);
+
+            // Initialize all voxels to Air
             for (int y = 0; y < sizeY; y++) {
-                int worldY = static_cast<int>(position.y) + y;
+                voxels[x][y][z] = BlockType::Air;
+            }
 
-                // 3D noise for caves
-                float noiseValue3D = perlinNoise.octave3D_01(worldX * 0.1f, worldY * 0.1f, worldZ * 0.1f, 4, 0.5f);
-                
-                // Caves: Create caves based on 3D noise value
-                if (y == surfaceHeight && y >= sizeY / 2) {
-                    // The topmost block is grass
-                    voxels[x][y][z] = BlockType::Grass;
-                } else if (y < surfaceHeight && y >= surfaceHeight - 3) {
-                    // The next 3 layers below the surface are dirt
-                    voxels[x][y][z] = BlockType::Dirt;
-                } else if (y < surfaceHeight - 3) {
-                    // Below the dirt is either stone or a cave
-                    if (noiseValue3D < 0.4f) {
-                        voxels[x][y][z] = BlockType::Air;  // Cave
-                    } else {
-                        voxels[x][y][z] = BlockType::Stone;  // Stone block
-                    }
+            // Fill solid blocks up to surfaceHeight
+            for (int y = 0; y <= surfaceHeight; y++) {
+                if (y == surfaceHeight) {
+                    voxels[x][y][z] = properties.surfaceBlock;
                 } else {
-                    // Air above the surface
+                    voxels[x][y][z] = properties.undergroundBlock;
+                }
+            }
+
+            // Carve caves using 3D noise
+            for (int y = 1; y <= surfaceHeight; y++) {  // Start from y=1 to avoid caves on the surface
+                int worldY = static_cast<int>(position.y) + y;
+                float caveFrequency = 0.05f;
+                float caveThreshold = 0.6f; // Adjust as needed
+                float caveNoise = perlinNoise.noise3D_01(worldX * caveFrequency, worldY * caveFrequency, worldZ * caveFrequency);
+
+                if (caveNoise > caveThreshold) {
+                    // Create cave
                     voxels[x][y][z] = BlockType::Air;
                 }
+            }
+
+            // Tree placement
+            if (biomeSupportsTrees(biome) && rand() % 100 < properties.treeProbability) {
+                placeTree(x, surfaceHeight + 1, z);
             }
         }
     }
@@ -175,30 +220,11 @@ void Chunk::addFace(const glm::vec3& pos, Face face) {
     glm::vec2 texCoords[4];
     float textureSize = 16.0f / 256.0f;  // Each sprite is 16x16 in a 256x256 texture atlas
 
-    int spriteX = 0;  // Default to grass top
-    int spriteY = 0;
+    BlockType textureBlockType = getBlockTextureType(blockType, face);
+    glm::vec2 spriteCoords = blockTypeToTextureCoords[textureBlockType];
+    int spriteX = static_cast<int>(spriteCoords.x);
+    int spriteY = static_cast<int>(spriteCoords.y);
 
-    // Special case: Grass block has different textures on different faces
-    if (blockType == BlockType::Grass) {
-        if (face == Face::top) {
-            spriteX = 0;  // Grass top texture
-            spriteY = 0;
-        } else if (face == Face::bottom) {
-            spriteX = 2;  // Dirt texture for bottom
-            spriteY = 0;
-        } else if (face == Face::left || face == Face::right || face == Face::front || face == Face::back) {
-            spriteX = 3;  // Grass side texture
-            spriteY = 0;
-        }
-    }
-    if (blockType == BlockType::Dirt) {
-        spriteX = 2;  // Dirt texture
-        spriteY = 0;
-    }
-    if (blockType == BlockType::Stone) {
-        spriteX = 1;  // Stone texture
-        spriteY = 0;
-    }
 
     float u0 = spriteX * textureSize;
     float v0 = spriteY * textureSize;
@@ -306,6 +332,38 @@ void Chunk::addFace(const glm::vec3& pos, Face face) {
     unsigned int offset = (vertices.size() / 3) - 4;
     for (auto index : voxelIndices) {
         indices.push_back(index + offset);
+    }
+}
+
+
+void Chunk::placeTree(int x, int y, int z) {
+    int trunkHeight = 5;  // You can randomize this if desired
+
+    // Trunk
+    for (int i = 0; i < trunkHeight; i++) {
+        if (y + i < sizeY) {
+            voxels[x][y + i][z] = BlockType::Wood;
+        }
+    }
+
+    // Leaves (simple cube around the top of the trunk)
+    for (int lx = -2; lx <= 2; lx++) {
+        for (int ly = trunkHeight - 2; ly <= trunkHeight + 2; ly++) {
+            for (int lz = -2; lz <= 2; lz++) {
+                int nx = x + lx;
+                int ny = y + ly;
+                int nz = z + lz;
+
+                if (nx >= 0 && nx < sizeX && ny >= 0 && ny < sizeY && nz >= 0 && nz < sizeZ) {
+                    // Simple spherical shape condition
+                    if (lx * lx + ly * ly + lz * lz <= 3 * 3) {
+                        if (voxels[nx][ny][nz] == BlockType::Air) {
+                            voxels[nx][ny][nz] = BlockType::Leaves;
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
