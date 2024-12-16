@@ -54,8 +54,11 @@ public:
     bool isVoxelSolid(int x, int y, int z) ;
     std::vector<std::vector<std::vector<BlockType>>> voxels;
     void setupMesh();
-
-
+    void addSurfaceDetails(int x, int z, int surfaceHeight, BiomeType biome);
+    bool shouldPlaceTree(int worldX, int worldZ, BiomeType biome);
+    void initializeVoxels(int x, int z, int surfaceY);
+    void carveCaves(int x, int z, int minWorldY, int surfaceHeight);
+    float generateBaseTerrainHeight(int x, int z, const siv::PerlinNoise& perlinNoise);
 
 
 private:

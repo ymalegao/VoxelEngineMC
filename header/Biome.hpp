@@ -13,12 +13,11 @@ enum class BiomeType {
 };
 
 struct BiomeProperties {
-    float terrainRoughness;
-    BlockType surfaceBlock;
-    BlockType undergroundBlock;
-    float densityThreshold;
-    int treeProbability;
-
+    float terrainRoughness;   // Controls the roughness of the terrain
+    float maxHeight;          // Maximum terrain height for the biome
+    BlockType surfaceBlock;   // Block type for the surface layer (e.g., grass)
+    BlockType subSurfaceBlock; // Block type for the layer beneath the surface (e.g., dirt)
+    int treeProbability;      // Probability of tree placement
 };
 
 // Declare the biome properties map

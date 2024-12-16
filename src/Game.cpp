@@ -23,6 +23,7 @@ namespace std {
 }
 
 #define CHUNK_SIZE 16
+#define CHUNK_HEIGHT 32
 
 Chunk *chunk;
 Camera *camera;
@@ -298,7 +299,7 @@ void Game::UpdateChunks() {
                 chunksInQueue.insert(chunkPos); // Mark chunk as enqueued
                 
                 threadPool.enqueueTask([this, chunkPos, x, z]() {
-                    Chunk* newChunk = new Chunk(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE, glm::vec3(x * CHUNK_SIZE, 0.0f, z * CHUNK_SIZE), this, shaderProgram, *textureManager);
+                    Chunk* newChunk = new Chunk(CHUNK_SIZE, CHUNK_HEIGHT, CHUNK_SIZE, glm::vec3(x * CHUNK_SIZE, 0.0f, z * CHUNK_SIZE), this, shaderProgram, *textureManager);
                     
                     std::lock_guard<std::mutex> lock(chunkMutex);
                     chunksToAdd.push_back(newChunk);
