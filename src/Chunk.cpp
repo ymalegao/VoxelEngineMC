@@ -139,7 +139,7 @@ void Chunk::initChunk() {
     }
 }
 bool Chunk::shouldPlaceTree(int worldX, int worldZ, BiomeType biome) {
-    int probability = 10; // 10% chance
+    int probability = 1; // 10% chance
 
 
     // Additional biome-specific checks
@@ -361,6 +361,7 @@ void Chunk::addFace(const glm::vec3& pos, Face face) {
 void Chunk::placeTree(int x, int surfaceHeight, int z) {
     if (surfaceHeight < 0 || surfaceHeight >= sizeY - 1) return;
 
+    // Place the trunk
     int trunkHeight = 5 + (rand() % 3);  // Random trunk height
     for (int i = 0; i < trunkHeight; i++) {
         int ny = surfaceHeight + i;
@@ -368,22 +369,31 @@ void Chunk::placeTree(int x, int surfaceHeight, int z) {
         voxels[x][ny][z] = BlockType::Wood;  // Trunk
     }
 
-    // Place leaves around the top of the trunk
-    for (int lx = -2; lx <= 2; lx++) {
-        for (int lz = -2; lz <= 2; lz++) {
-            for (int ly = -2; ly <= 2; ly++) {
-                if (lx * lx + lz * lz + ly * ly <= 3) {  // Spherical canopy
-                    int nx = x + lx, ny = surfaceHeight + trunkHeight - 1 + ly, nz = z + lz;
-                    if (nx >= 0 && nx < sizeX && ny >= 0 && ny < sizeY && nz >= 0 && nz < sizeZ) {
-                        if (voxels[nx][ny][nz] == BlockType::Air) {
-                            voxels[nx][ny][nz] = BlockType::Leaves;
-                        }
+    // Create spherical layers for the canopy
+    int canopyRadius = 3;  // Radius of the largest layer
+    int canopyHeight = 4;  // Height of the canopy
+    int canopyCenterY = surfaceHeight + trunkHeight;
+
+    for (int ly = -canopyHeight; ly <= canopyHeight; ly++) {  // Iterate vertically through the spherical canopy
+    float layerRadius = canopyRadius * (1.0f - static_cast<float>(std::abs(ly)) / canopyHeight);  // Adjust radius based on height
+    int roundedRadius = static_cast<int>(glm::ceil(layerRadius));
+
+    for (int lx = -roundedRadius; lx <= roundedRadius; lx++) {
+        for (int lz = -roundedRadius; lz <= roundedRadius; lz++) {
+            float distance = glm::sqrt(lx * lx + lz * lz);  // Horizontal distance from the center
+            if (distance <= layerRadius) {  // Only include voxels within the current layer's radius
+                int nx = x + lx, ny = surfaceHeight + trunkHeight + ly, nz = z + lz;
+                if (nx >= 0 && nx < sizeX && ny >= 0 && ny < sizeY && nz >= 0 && nz < sizeZ) {
+                    if (voxels[nx][ny][nz] == BlockType::Air) {
+                        voxels[nx][ny][nz] = BlockType::Leaves;
                     }
                 }
             }
         }
     }
+    }
 }
+
 
 void Chunk::bindTextures() {
     for (size_t i = 0; i < faceTextures.size(); ++i) {
