@@ -10,6 +10,11 @@
 #include "ShaderLoader.hpp"
 #include "ThreadPool.hpp"
 #include "TexureManager.hpp"
+#include "imgui/imgui.h"
+#include "imgui/backends/imgui_impl_glfw.h"
+#include "imgui/backends/imgui_impl_opengl3.h"
+#include "imGuiHandler.hpp"
+#include "Log.hpp"
 class Chunk;
 
 
@@ -32,9 +37,33 @@ public:
     GLuint textureID;
     bool raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, Chunk& chunk, glm::ivec3& hitVoxel, float maxDistance);
     void drawRay(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, float length);
-
+    Log logger;
     void Run();
     std::unordered_map<std::pair<int, int>, Chunk*, pair_hash> loadedChunks;
+
+    struct OpenGLState {
+    GLint lastProgram;
+    GLint lastTexture;
+    GLint lastArrayBuffer;
+    GLint lastElementArrayBuffer;
+    GLint lastVertexArray;
+};
+
+void SaveOpenGLState(OpenGLState& state) {
+    glGetIntegerv(GL_CURRENT_PROGRAM, &state.lastProgram);
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &state.lastTexture);
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &state.lastArrayBuffer);
+    glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &state.lastElementArrayBuffer);
+    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &state.lastVertexArray);
+}
+
+void RestoreOpenGLState(const OpenGLState& state) {
+    glUseProgram(state.lastProgram);
+    glBindTexture(GL_TEXTURE_2D, state.lastTexture);
+    glBindBuffer(GL_ARRAY_BUFFER, state.lastArrayBuffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, state.lastElementArrayBuffer);
+    glBindVertexArray(state.lastVertexArray);
+}
 
 
 private:

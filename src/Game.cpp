@@ -35,10 +35,11 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 ThreadPool threadPool(8);
 TextureManager *textureManager = new TextureManager();
-
+bool isInteractingWithImGui = false;
 
 std::deque<Chunk*> chunksToAdd;
 std::mutex chunkMutex;
+Log logger;
 
 
 
@@ -181,6 +182,10 @@ Game::~Game() {
         }
     }
     loadedChunks.clear(); // Clear the map after deletion
+
+    
+    ImGuiHandler::Shutdown();
+
     glfwTerminate();       // Terminate GLFW
 }
 
@@ -222,7 +227,11 @@ void Game::Init() {
     glfwSetMouseButtonCallback(window, mouse_click_callback);
     glfwSetCursorPosCallback(window, mouse_button_callback);
     glfwSetKeyCallback(window, key_callback);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    
+    
+    
+    
     glGenVertexArrays(1, &rayVAO);
     glGenBuffers(1, &rayVBO);
 
@@ -237,6 +246,9 @@ void Game::Init() {
     glEnableVertexAttribArray(0);
 
     glBindVertexArray(0);
+
+    logger.initialize(Log::INFO);
+    ImGuiHandler::Initialize(window);
 
     // Initialize game objects
     float lastX = framebufferWidth / 2.0f;
@@ -260,18 +272,26 @@ void Game::drawRay(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, fl
 }
 
 void Game::ProcessInput(float deltaTime) {
+    if (glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS) {
+        isInteractingWithImGui = !isInteractingWithImGui; // Toggle interaction mode
+        glfwSetInputMode(window, GLFW_CURSOR, isInteractingWithImGui ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+    }
+    
     
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        camera->processInput(FORWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        camera->processInput(BACKWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        camera->processInput(LEFT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        camera->processInput(RIGHT, deltaTime);
+
+    if (!isInteractingWithImGui) {
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+            camera->processInput(FORWARD, deltaTime);
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+            camera->processInput(BACKWARD, deltaTime);
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+            camera->processInput(LEFT, deltaTime);
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+            camera->processInput(RIGHT, deltaTime);
+    }
 
 }
 
@@ -363,7 +383,9 @@ void Game::Render() {
     glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f);  // White light (corrected)
     glm::vec3 ambientColor = glm::vec3(0.53f, 0.81f, 0.98f);  // Light sky blue as ambient
 
+    logger.checkOpenGLError("Render start");
     glUseProgram(shaderProgram);
+    logger.checkOpenGLError("After shader program");
 
     // Pass light information to the shader
     GLuint lightDirLoc = glGetUniformLocation(shaderProgram, "lightDir");
@@ -393,6 +415,23 @@ void Game::Render() {
         chunkPair.second->render(shaderProgram, view, projection);
     }
 
+    OpenGLState state;
+    SaveOpenGLState(state);
+
+    // Render ImGui
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    ImGui::Begin("Log");
+    logger.displayLog();
+    ImGui::End();
+
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+    // Restore OpenGL state
+    RestoreOpenGLState(state);
     // Swap buffers to display the rendered frame
     glfwSwapBuffers(window);
 }
