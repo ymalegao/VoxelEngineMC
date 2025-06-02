@@ -9,14 +9,22 @@ using namespace std;
 #include "imgui/imgui.h"
 #include <OpenGL/gl.h>
 
+#define ENSURE_MAIN_THREAD() \
+    do { \
+        static const auto mainThreadId = std::this_thread::get_id(); \
+        assert(std::this_thread::get_id() == mainThreadId && "ImGui used from non-main thread!"); \
+    } while(0)
+
 
 class Log {
     private:
         int logLevel;
         ofstream logFile;
         vector<string> logMessages;
+        std::mutex logMutex;
 
-    
+
+
     public:
         enum Level {
             DEBUG = 0,
@@ -48,6 +56,7 @@ class Log {
         }
 
         void log(const string& level, string message){
+            std::lock_guard<std::mutex> lock(logMutex);
             string fullMessage = "[ " + level + " ] " + message;
             logMessages.push_back(fullMessage);
             if (logFile.is_open()) {
@@ -55,9 +64,10 @@ class Log {
             }
             cout << fullMessage << endl;
 
-            
+
         }
         void setLevel(int level, const string& message){
+            // std::lock_guard<std::mutex> lock(logMutex);
             if (level >= logLevel){
                 switch(level){
                     case DEBUG:
@@ -76,15 +86,17 @@ class Log {
                 }
 
             }
-            
+
         }
         void displayLog(){
+            ENSURE_MAIN_THREAD();
+
             ImGui::Begin("Log");
 
             if (ImGui::Button("Clear")) {
                 ImGui::Separator();
             }
-            
+
             ImGui::Separator();
 
             for (const auto& message : logMessages) {
@@ -94,11 +106,12 @@ class Log {
         }
 
 
-        void checkOpenGLError(const std::string& context) {
+        void checkOpenGLError(const std::string& tag) {
             GLenum err;
             while ((err = glGetError()) != GL_NO_ERROR) {
-                std::string errorMessage = "OpenGL error: " + std::to_string(err) + " in " + context;
-                log("ERROR", errorMessage);
+                std::stringstream ss;
+                ss << "[OpenGL ERROR] " << err << " in " << tag;
+                        log("ERROR", ss.str());  // Store string safely
             }
         }
 

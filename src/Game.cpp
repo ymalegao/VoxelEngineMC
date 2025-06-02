@@ -74,9 +74,9 @@ void Game::mouse_click_callback(GLFWwindow* window, int button, int action, int 
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
         // for (const auto& chunkPair : game->loadedChunks) {
         //         chunkPair.second->randomlyRemoveVoxels();
-      
-        
-        
+
+
+
         glm::vec3 rayOrigin = camera->cameraPos;         // The origin of the ray is the camera position
         glm::vec3 rayDirection = camera->cameraFront;    // The ray is cast in the direction the camera is facing
         glm::ivec3 hitVoxel;
@@ -84,7 +84,7 @@ void Game::mouse_click_callback(GLFWwindow* window, int button, int action, int 
         cout << "Raycasting" << endl;
         cout << "Ray Origin: " << rayOrigin.x << " " << rayOrigin.y << " " << rayOrigin.z << endl;
         cout << "Ray Direction: " << rayDirection.x << " " << rayDirection.y << " " << rayDirection.z << endl;
-        
+
         if (game->castRayForVoxel(rayOrigin, rayDirection, hitVoxel, 50.0f)) {
         // If a voxel was hit, highlight or mark it (implement the logic to highlight)
             cout << "Voxel hit at " << hitVoxel.x << " " << hitVoxel.y << " " << hitVoxel.z << endl;
@@ -114,16 +114,16 @@ bool Game::raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, Ch
                                  rayDirection.z > 0 ? 1 : -1);
 
     glm::vec3 tMax = (glm::vec3(currentVoxel) + glm::vec3(
-        step.x > 0 ? 1.0f : 0.0f, 
-        step.y > 0 ? 1.0f : 0.0f, 
-        step.z > 0 ? 1.0f : 0.0f) - rayPos) / rayDirection;    
+        step.x > 0 ? 1.0f : 0.0f,
+        step.y > 0 ? 1.0f : 0.0f,
+        step.z > 0 ? 1.0f : 0.0f) - rayPos) / rayDirection;
     float distance = 0.0f;
 
     while (distance < maxDistance) {
         // Debug the current ray position
         std::cout << "Raycasting at voxel: (" << currentVoxel.x << ", " << currentVoxel.y << ", " << currentVoxel.z << ")" << std::endl;
-        
-        
+
+
 
         // Check if the current voxel is solid
         if (chunk.isVoxelSolid(currentVoxel.x, currentVoxel.y, currentVoxel.z)) {
@@ -170,7 +170,7 @@ bool Game::raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, Ch
     return false;  // No voxel was hit
 }
 
-Game::Game(int width, int height) 
+Game::Game(int width, int height)
     : width(width), height(height) {
 }
 
@@ -183,7 +183,7 @@ Game::~Game() {
     }
     loadedChunks.clear(); // Clear the map after deletion
 
-    
+
     ImGuiHandler::Shutdown();
 
     glfwTerminate();       // Terminate GLFW
@@ -212,7 +212,7 @@ void Game::Init() {
         return;
     }
 
-    
+
     int framebufferWidth, framebufferHeight;
     glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
     std::cout << "Framebuffer width: " << framebufferWidth << " height: " << framebufferHeight << std::endl;
@@ -228,10 +228,10 @@ void Game::Init() {
     glfwSetCursorPosCallback(window, mouse_button_callback);
     glfwSetKeyCallback(window, key_callback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-    
-    
-    
-    
+
+
+
+
     glGenVertexArrays(1, &rayVAO);
     glGenBuffers(1, &rayVBO);
 
@@ -247,6 +247,8 @@ void Game::Init() {
 
     glBindVertexArray(0);
 
+
+
     logger.initialize(Log::INFO);
     ImGuiHandler::Initialize(window);
 
@@ -256,7 +258,7 @@ void Game::Init() {
 
     // chunk = new Chunk(16,16,16, glm::vec3(0.0f, 0.0f, 0.0f) , this); ;
     camera = new Camera();
-    shaderProgram = shaderLoader->loadShaders("VertShader.vertexshader", "FragShader.fragmentshader");    
+    shaderProgram = shaderLoader->loadShaders("VertShader.vertexshader", "FragShader.fragmentshader");
     this->textureManager = new TextureManager();
     this->textureID = textureManager->loadTexture("pics/spritesheet.png");
     cout << "Texture ID: " << textureID << endl;
@@ -276,8 +278,8 @@ void Game::ProcessInput(float deltaTime) {
         isInteractingWithImGui = !isInteractingWithImGui; // Toggle interaction mode
         glfwSetInputMode(window, GLFW_CURSOR, isInteractingWithImGui ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
     }
-    
-    
+
+
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
@@ -317,10 +319,10 @@ void Game::UpdateChunks() {
                 // Only enqueue if the chunk is neither loaded nor already in the queue
                 std::cout << "Enqueueing new chunk at: (" << x << ", " << z << ")" << std::endl;
                 chunksInQueue.insert(chunkPos); // Mark chunk as enqueued
-                
+
                 threadPool.enqueueTask([this, chunkPos, x, z]() {
                     Chunk* newChunk = new Chunk(CHUNK_SIZE, CHUNK_HEIGHT, CHUNK_SIZE, glm::vec3(x * CHUNK_SIZE, 0.0f, z * CHUNK_SIZE), this, shaderProgram, *textureManager);
-                    
+
                     std::lock_guard<std::mutex> lock(chunkMutex);
                     chunksToAdd.push_back(newChunk);
 
@@ -367,56 +369,82 @@ bool Game::castRayForVoxel(const glm::vec3& rayOrigin, const glm::vec3& rayDirec
             return raycast(rayOrigin, rayDirection, *chunkPair.second, hitVoxel, maxDistance);
         }
     }
-    
+
 }
 void Game::Render() {
     // Enable wireframe mode for debugging (if needed)
-    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); 
+    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    
     // Set the sky color to light sky blue
     glClearColor(0.53f, 0.81f, 0.98f, 1.0f);
+    logger.checkOpenGLError("After clear");
+
+    // Validate shader program before use
+    if (shaderProgram == 0) {
+        logger.setLevel(Log::ERROR, "Invalid shader program in render");
+        return;
+    }
 
     // Set up lighting and ambient colors
-    glm::vec3 lightDir = glm::normalize(glm::vec3(-0.2f, -1.0f, -0.3f));  // Direction of the light
-    glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f);  // White light (corrected)
-    glm::vec3 ambientColor = glm::vec3(0.53f, 0.81f, 0.98f);  // Light sky blue as ambient
+    glm::vec3 lightDir = glm::normalize(glm::vec3(-0.2f, -1.0f, -0.3f));
+    glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f);
+    glm::vec3 ambientColor = glm::vec3(0.53f, 0.81f, 0.98f);
 
-    logger.checkOpenGLError("Render start");
     glUseProgram(shaderProgram);
     logger.checkOpenGLError("After shader program");
 
-    // Pass light information to the shader
+    // Pass light information to the shader with validation
     GLuint lightDirLoc = glGetUniformLocation(shaderProgram, "lightDir");
     GLuint lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
     GLuint ambientColorLoc = glGetUniformLocation(shaderProgram, "ambientColor");
 
-    glUniform3fv(lightDirLoc, 1, glm::value_ptr(lightDir));
-    glUniform3fv(lightColorLoc, 1, glm::value_ptr(lightColor));
-    glUniform3fv(ambientColorLoc, 1, glm::value_ptr(ambientColor));
+    if (lightDirLoc != -1) {
+        glUniform3fv(lightDirLoc, 1, glm::value_ptr(lightDir));
+    }
+    if (lightColorLoc != -1) {
+        glUniform3fv(lightColorLoc, 1, glm::value_ptr(lightColor));
+    }
+    if (ambientColorLoc != -1) {
+        glUniform3fv(ambientColorLoc, 1, glm::value_ptr(ambientColor));
+    }
+    logger.checkOpenGLError("After light uniforms");
 
-
-
-    // Bind the texture atlas once (assuming you have the texture atlas loaded in texture unit 0)
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, textureManager->loadTexture("pics/mcspritesheet.png"));
-    GLint textureUniformLoc = glGetUniformLocation(shaderProgram, "blockTexture");
-    glUniform1i(textureUniformLoc, 0);  // Texture unit 0
-
-    // Update the view matrix from the camera
-    glm::mat4 view = camera->getViewMatrix();
-    
-    // Set the projection matrix for 3D perspective
-    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 100.0f);
-
-    // Render all chunks
-    for (const auto& chunkPair : loadedChunks) {
-        chunkPair.second->render(shaderProgram, view, projection);
+    // Validate and bind texture
+    if (this->textureID == 0) {
+        logger.setLevel(Log::WARNING, "Invalid texture ID in render");
+    } else {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, this->textureID);
+        GLint textureUniformLoc = glGetUniformLocation(shaderProgram, "blockTexture");
+        if (textureUniformLoc != -1) {
+            glUniform1i(textureUniformLoc, 0);
+        }
+        logger.checkOpenGLError("After texture binding");
     }
 
+    // Update matrices
+    glm::mat4 view = camera->getViewMatrix();
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 100.0f);
+
+    // Render all chunks with validation
+    logger.setLevel(Log::DEBUG, "Rendering " + std::to_string(loadedChunks.size()) + " chunks");
+    for (const auto& chunkPair : loadedChunks) {
+        if (chunkPair.second != nullptr) {
+            chunkPair.second->render(shaderProgram, view, projection);
+            logger.checkOpenGLError("After chunk render");
+        }
+    }
+
+    // Save OpenGL state before ImGui
     OpenGLState state;
     SaveOpenGLState(state);
+    logger.checkOpenGLError("After saving OpenGL state");
+
+    // Ensure we're in the right state for ImGui
+    glUseProgram(0);  // Clear shader program
+    glBindTexture(GL_TEXTURE_2D, 0);  // Clear texture binding
+    glBindVertexArray(0);  // Clear VAO binding
 
     // Render ImGui
     ImGui_ImplOpenGL3_NewFrame();
@@ -429,9 +457,12 @@ void Game::Render() {
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    logger.checkOpenGLError("After ImGui render");
 
-    // Restore OpenGL state
+    // Restore OpenGL state after ImGui
     RestoreOpenGLState(state);
+    logger.checkOpenGLError("After restoring OpenGL state");
+
     // Swap buffers to display the rendered frame
     glfwSwapBuffers(window);
 }
@@ -442,13 +473,25 @@ void Game::Render() {
 void Game::Run() {
     Init();
 
+    logger.setLevel(Log::INFO, "Game running...");
+
     while (!glfwWindowShouldClose(window)) {
         float currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
-        Render();
-        Update(deltaTime);
+
+        // Process input first to ensure responsive controls
         ProcessInput(deltaTime);
+
+        // Update game state
+        Update(deltaTime);
+
+        // Render the frame
+        Render();
+
+        // Poll for events
         glfwPollEvents();
     }
+
+    logger.setLevel(Log::INFO, "Game shutting down...");
 }

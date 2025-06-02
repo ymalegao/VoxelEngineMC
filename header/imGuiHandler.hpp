@@ -5,6 +5,11 @@
 #include "imgui/imgui.h"
 #include "imgui/backends/imgui_impl_glfw.h"
 #include "imgui/backends/imgui_impl_opengl3.h"
+#define ENSURE_MAIN_THREAD() \
+    do { \
+        static const auto mainThreadId = std::this_thread::get_id(); \
+        assert(std::this_thread::get_id() == mainThreadId && "ImGui used from non-main thread!"); \
+    } while(0)
 
 class ImGuiHandler {
 public:
@@ -18,6 +23,7 @@ public:
     }
 
     static void BeginFrame() {
+        ENSURE_MAIN_THREAD();
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();

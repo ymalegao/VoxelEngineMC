@@ -37,7 +37,7 @@ Chunk::~Chunk() {
     glDeleteBuffers(1, &VBO);
     glDeleteBuffers(1, &EBO);
     glDeleteBuffers(1, &TBO);
-    glDeleteProgram(shaderProgram);
+    // Don't delete shader program - it's shared between chunks and managed by Game class
 }
 
 void Chunk::loadShaders(const std::string& vertexPath, const std::string& fragmentPath){
@@ -604,6 +604,20 @@ void Chunk::randomlyRemoveVoxels(){
 
 
 void Chunk::render(GLuint shaderProgram, const glm::mat4& view, const glm::mat4& projection) {
+    // Validate shader program
+    if (shaderProgram == 0 || !glIsProgram(shaderProgram)) {
+        std::cerr << "Error: Invalid or corrupted shader program: " << shaderProgram << std::endl;
+        return;
+    }
+    
+    // Check if the program is linked
+    GLint linkStatus;
+    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &linkStatus);
+    if (linkStatus != GL_TRUE) {
+        std::cerr << "Error: Shader program is not properly linked" << std::endl;
+        return;
+    }
+    
     glUseProgram(shaderProgram);
     CHECK_GL_ERROR();
 
@@ -611,39 +625,75 @@ void Chunk::render(GLuint shaderProgram, const glm::mat4& view, const glm::mat4&
 
     // Set the uniform matrices (model, view, projection)
     int modelLoc = glGetUniformLocation(shaderProgram, "model");
-    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-    CHECK_GL_ERROR();
+    if (modelLoc != -1) {
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+        CHECK_GL_ERROR();
+    }
 
     int viewLoc = glGetUniformLocation(shaderProgram, "view");
-    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-    CHECK_GL_ERROR();
+    if (viewLoc != -1) {
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+        CHECK_GL_ERROR();
+    }
 
     int projLoc = glGetUniformLocation(shaderProgram, "projection");
-    glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-    CHECK_GL_ERROR();
+    if (projLoc != -1) {
+        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+        CHECK_GL_ERROR();
+    }
 
+    // Validate OpenGL objects before binding
+    if (VAO == 0 || !glIsVertexArray(VAO)) {
+        std::cerr << "Error: Invalid or corrupted VAO: " << VAO << std::endl;
+        return;
+    }
+    
+    if (VBO == 0 || !glIsBuffer(VBO)) {
+        std::cerr << "Error: Invalid or corrupted VBO: " << VBO << std::endl;
+        return;
+    }
+    
+    if (EBO == 0 || !glIsBuffer(EBO)) {
+        std::cerr << "Error: Invalid or corrupted EBO: " << EBO << std::endl;
+        return;
+    }
+    
     glBindVertexArray(VAO);
     CHECK_GL_ERROR();
 
-    // Bind the entire texture atlas
-    GLuint textureID = textureManager.loadTexture("pics/mcspritesheet.png");
-    if (textureID == 0) {
-        std::cerr << "Error: Failed to load texture atlas" << std::endl;
+    // Use cached texture ID or load once
+    static GLuint cachedTextureID = 0;
+    if (cachedTextureID == 0) {
+        cachedTextureID = textureManager.loadTexture("pics/mcspritesheet.png");
+        if (cachedTextureID == 0) {
+            std::cerr << "Error: Failed to load texture atlas" << std::endl;
+            glBindVertexArray(0);
+            return;
+        }
+        
+        // Set texture parameters only once
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, cachedTextureID);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    } else {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, cachedTextureID);
     }
-    
-    glActiveTexture(GL_TEXTURE0);
-    
-    glBindTexture(GL_TEXTURE_2D, textureID);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-    CHECK_GL_ERROR();  // Check if there's an OpenGL error after binding the texture.
-    glUniform1i(glGetUniformLocation(shaderProgram, "blockTexture"), 0);  // Set the atlas to the shader
     CHECK_GL_ERROR();
+    
+    int textureUniformLoc = glGetUniformLocation(shaderProgram, "blockTexture");
+    if (textureUniformLoc != -1) {
+        glUniform1i(textureUniformLoc, 0);  // Set the atlas to the shader
+        CHECK_GL_ERROR();
+    }
 
     // Draw all elements at once using the already set UV coordinates
-    glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
-    CHECK_GL_ERROR();
+    if (!indices.empty()) {
+        glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+        CHECK_GL_ERROR();
+    }
 
     glBindVertexArray(0);
     CHECK_GL_ERROR();
