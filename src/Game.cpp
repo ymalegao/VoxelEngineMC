@@ -2,6 +2,7 @@
 #include "Cube.hpp"
 #include "Chunk.hpp"
 #include "Camera.hpp"
+#include <cmath>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
@@ -107,7 +108,7 @@ void Game::key_callback(GLFWwindow* window, int key, int scancode, int action, i
 bool Game::raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, Chunk& chunk, glm::ivec3& hitVoxel, float maxDistance) {
     glm::vec3 rayPos = rayOrigin;  // Starting point of the ray
     glm::vec3 stepSize = glm::vec3(1.0f) / glm::abs(rayDirection);  // Step size for each axis
-    glm::ivec3 currentVoxel = glm::ivec3(std::floor(rayPos.x), std::floor(rayPos.y), std::floor(rayPos.z));  // Starting voxel
+    glm::ivec3 currentVoxel = glm::ivec3(std::floor(rayPos.x), std::floor(rayPos.y), std::floor(rayPos.z));  // Starting voxel (world coordinates)
 
     glm::ivec3 step = glm::ivec3(rayDirection.x > 0 ? 1 : -1,
                                  rayDirection.y > 0 ? 1 : -1,
@@ -120,18 +121,38 @@ bool Game::raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, Ch
     float distance = 0.0f;
 
     while (distance < maxDistance) {
-        // Debug the current ray position
-        std::cout << "Raycasting at voxel: (" << currentVoxel.x << ", " << currentVoxel.y << ", " << currentVoxel.z << ")" << std::endl;
+        // Convert world coordinates to chunk-local coordinates
+        glm::ivec3 chunkLocalVoxel = glm::ivec3(
+            currentVoxel.x - static_cast<int>(chunk.position.x),
+            currentVoxel.y - static_cast<int>(chunk.position.y),
+            currentVoxel.z - static_cast<int>(chunk.position.z)
+        );
+        
+        // Debug the current ray position (world coordinates)
+        std::cout << "Raycasting at world voxel: (" << currentVoxel.x << ", " << currentVoxel.y << ", " << currentVoxel.z << ")" << std::endl;
+        std::cout << "Chunk-local voxel: (" << chunkLocalVoxel.x << ", " << chunkLocalVoxel.y << ", " << chunkLocalVoxel.z << ")" << std::endl;
 
+        // Check if the chunk-local coordinates are within bounds
+        if (chunkLocalVoxel.x < 0 || chunkLocalVoxel.x >= chunk.sizeX ||
+            chunkLocalVoxel.y < 0 || chunkLocalVoxel.y >= chunk.sizeY ||
+            chunkLocalVoxel.z < 0 || chunkLocalVoxel.z >= chunk.sizeZ) {
+            // Ray has left this chunk, break
+            break;
+        }
 
-
-        // Check if the current voxel is solid
-        if (chunk.isVoxelSolid(currentVoxel.x, currentVoxel.y, currentVoxel.z)) {
-            hitVoxel = currentVoxel;  // Record the hit voxel
-            chunk.voxels[currentVoxel.x][currentVoxel.y][currentVoxel.z] = BlockType::Air;  // Remove the voxel
+        // Check if the current voxel is solid using chunk-local coordinates
+        if (chunk.isVoxelSolid(chunkLocalVoxel.x, chunkLocalVoxel.y, chunkLocalVoxel.z)) {
+            hitVoxel = currentVoxel;  // Record the hit voxel (world coordinates)
+            
+            // Remove the voxel using chunk-local coordinates
+            chunk.voxels[chunkLocalVoxel.x][chunkLocalVoxel.y][chunkLocalVoxel.z] = BlockType::Air;
             chunk.generateChunk();  // Regenerate the chunk
             chunk.setupMesh();  // Setup the mesh
+            
             cout << "we hit a solid voxel" << endl;
+            string coords = "(" + std::to_string(currentVoxel.x) + ", " + std::to_string(currentVoxel.y) + ", " + std::to_string(currentVoxel.z) + ")";
+            string localCoords = "(" + std::to_string(chunkLocalVoxel.x) + ", " + std::to_string(chunkLocalVoxel.y) + ", " + std::to_string(chunkLocalVoxel.z) + ")";
+            logger.log("INFO", "Hit solid voxel at world " + coords + " chunk-local " + localCoords);
             return true;  // Ray hit a solid voxel
         }
 
@@ -158,12 +179,7 @@ bool Game::raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, Ch
             }
         }
 
-        // Break if ray exits chunk bounds
-        if (currentVoxel.x < 0 || currentVoxel.x >= chunk.sizeX ||
-            currentVoxel.y < 0 || currentVoxel.y >= chunk.sizeY ||
-            currentVoxel.z < 0 || currentVoxel.z >= chunk.sizeZ) {
-            break;
-        }
+        // This check is now done above after coordinate conversion
     }
     cout << "Raycast finished" << endl;
     cout << "Ray hit nothing" << endl;
@@ -360,16 +376,109 @@ void Game::UpdateChunks() {
 }
 
 
+Chunk* Game::getChunkAtWorldPosition(const glm::vec3& worldPos) {
+    int chunkX = static_cast<int>(std::floor(worldPos.x / CHUNK_SIZE));
+    int chunkZ = static_cast<int>(std::floor(worldPos.z / CHUNK_SIZE));
+    
+    auto it = loadedChunks.find({chunkX, chunkZ});
+    if (it != loadedChunks.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
 bool Game::castRayForVoxel(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, glm::ivec3& hitVoxel, float maxDistance) {
-    //find the chunk that the ray is in
-    for (const auto& chunkPair : loadedChunks) {
-        if (chunkPair.second->position.x <= rayOrigin.x && rayOrigin.x < chunkPair.second->position.x + CHUNK_SIZE &&
-            chunkPair.second->position.z <= rayOrigin.z && rayOrigin.z < chunkPair.second->position.z + CHUNK_SIZE) {
-            cout << "Ray is in chunk at " << chunkPair.first.first << " " << chunkPair.first.second << endl;
-            return raycast(rayOrigin, rayDirection, *chunkPair.second, hitVoxel, maxDistance);
+    glm::vec3 rayPos = rayOrigin;
+    glm::vec3 stepSize = glm::vec3(1.0f) / glm::abs(rayDirection);
+    glm::ivec3 currentVoxel = glm::ivec3(std::floor(rayPos.x), std::floor(rayPos.y), std::floor(rayPos.z));
+
+    glm::ivec3 step = glm::ivec3(rayDirection.x > 0 ? 1 : -1,
+                                 rayDirection.y > 0 ? 1 : -1,
+                                 rayDirection.z > 0 ? 1 : -1);
+
+    glm::vec3 tMax = (glm::vec3(currentVoxel) + glm::vec3(
+        step.x > 0 ? 1.0f : 0.0f,
+        step.y > 0 ? 1.0f : 0.0f,
+        step.z > 0 ? 1.0f : 0.0f) - rayPos) / rayDirection;
+    
+    float distance = 0.0f;
+    Chunk* lastChunk = nullptr;
+
+    while (distance < maxDistance) {
+        // Get the chunk at current world position
+        glm::vec3 worldPos = glm::vec3(currentVoxel.x, currentVoxel.y, currentVoxel.z);
+        Chunk* currentChunk = getChunkAtWorldPosition(worldPos);
+        
+        if (currentChunk != nullptr) {
+            // Log chunk change
+            if (currentChunk != lastChunk) {
+                int chunkX = static_cast<int>(std::floor(worldPos.x / CHUNK_SIZE));
+                int chunkZ = static_cast<int>(std::floor(worldPos.z / CHUNK_SIZE));
+                string chunkName = "Chunk_" + std::to_string(chunkX) + "_" + std::to_string(chunkZ);
+                logger.log("INFO", "Ray entered " + chunkName);
+                lastChunk = currentChunk;
+            }
+            
+            // Convert world coordinates to chunk-local coordinates
+            glm::ivec3 chunkLocalVoxel = glm::ivec3(
+                currentVoxel.x - static_cast<int>(currentChunk->position.x),
+                currentVoxel.y - static_cast<int>(currentChunk->position.y),
+                currentVoxel.z - static_cast<int>(currentChunk->position.z)
+            );
+            
+            // Check bounds within chunk
+            if (chunkLocalVoxel.x >= 0 && chunkLocalVoxel.x < currentChunk->sizeX &&
+                chunkLocalVoxel.y >= 0 && chunkLocalVoxel.y < currentChunk->sizeY &&
+                chunkLocalVoxel.z >= 0 && chunkLocalVoxel.z < currentChunk->sizeZ) {
+                
+                // Check if the current voxel is solid
+                if (currentChunk->isVoxelSolid(chunkLocalVoxel.x, chunkLocalVoxel.y, chunkLocalVoxel.z)) {
+                    hitVoxel = currentVoxel;  // Record the hit voxel (world coordinates)
+                    
+                    // Remove the voxel using chunk-local coordinates
+                    currentChunk->voxels[chunkLocalVoxel.x][chunkLocalVoxel.y][chunkLocalVoxel.z] = BlockType::Air;
+                    currentChunk->generateChunk();
+                    currentChunk->setupMesh();
+                    
+                    string coords = "(" + std::to_string(currentVoxel.x) + ", " + std::to_string(currentVoxel.y) + ", " + std::to_string(currentVoxel.z) + ")";
+                    string localCoords = "(" + std::to_string(chunkLocalVoxel.x) + ", " + std::to_string(chunkLocalVoxel.y) + ", " + std::to_string(chunkLocalVoxel.z) + ")";
+                    logger.log("INFO", "Hit solid voxel at world " + coords + " chunk-local " + localCoords);
+                    return true;
+                }
+            }
+        }
+
+        // Move to the next voxel boundary
+        if (tMax.x < tMax.y) {
+            if (tMax.x < tMax.z) {
+                currentVoxel.x += step.x;
+                distance = tMax.x;
+                tMax.x += stepSize.x;
+            } else {
+                currentVoxel.z += step.z;
+                distance = tMax.z;
+                tMax.z += stepSize.z;
+            }
+        } else {
+            if (tMax.y < tMax.z) {
+                currentVoxel.y += step.y;
+                distance = tMax.y;
+                tMax.y += stepSize.y;
+            } else {
+                currentVoxel.z += step.z;
+                distance = tMax.z;
+                tMax.z += stepSize.z;
+            }
+        }
+
+        // Break if we go too far underground or too high
+        if (currentVoxel.y < 0 || currentVoxel.y > 64) {
+            break;
         }
     }
-
+    
+    logger.log("INFO", "Ray hit nothing");
+    return false;
 }
 void Game::Render() {
     // Enable wireframe mode for debugging (if needed)

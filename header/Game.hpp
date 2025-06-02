@@ -37,6 +37,7 @@ public:
     GLuint textureID;
     bool raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, Chunk& chunk, glm::ivec3& hitVoxel, float maxDistance);
     void drawRay(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, float length);
+    Chunk* getChunkAtWorldPosition(const glm::vec3& worldPos);
     Log logger;
     void Run();
     std::unordered_map<std::pair<int, int>, Chunk*, pair_hash> loadedChunks;

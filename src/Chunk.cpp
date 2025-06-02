@@ -11,7 +11,7 @@ GLenum err;
     while ((err = glGetError()) != GL_NO_ERROR) { \
         std::cerr << "OpenGL error: " << err << " at line " << __LINE__ << std::endl; \
     }
-    
+
 
 
 
@@ -24,7 +24,7 @@ Chunk::Chunk(int sizeX, int sizeY, int sizeZ, glm::vec3 position , Game *gameRef
 
     voxels = std::vector<std::vector<std::vector<BlockType>>>(sizeX, std::vector<std::vector<BlockType>>(sizeY, std::vector<BlockType>(sizeZ)));
     //initialize voxels
-    
+
     // cout << "Creating chunk for sizes" << sizeX << sizeY << sizeX <<  "at position" << position.x << position.y << position.z << endl;
     // loadShaders("VertShader.vertexshader", "FragShader.fragmentshader");
     initChunk();
@@ -37,6 +37,8 @@ Chunk::~Chunk() {
     glDeleteBuffers(1, &VBO);
     glDeleteBuffers(1, &EBO);
     glDeleteBuffers(1, &TBO);
+    // glDeleteProgram(shaderProgram);
+
     // Don't delete shader program - it's shared between chunks and managed by Game class
 }
 
@@ -202,17 +204,17 @@ void Chunk::generateChunk(){
     vertices.clear();
     indices.clear();
     texCoordsArray.clear();
-    
+
     // cout << "Generating chunk for sizes" << sizeX << sizeX << endl;
     for (int x = 0; x < sizeX; x++){
         for (int z = 0; z < sizeZ; z++){
             for (int y = 0; y < sizeY; y++){
-                
+
                 // Only process solid voxels
                 if (voxels[x][y][z] != BlockType::Air) {
                     glm::vec3 pos = glm::vec3(x, y, z);
 
-                   
+
                     // Face culling logic: only add the face if it's adjacent to air or chunk boundary
                     if (y == sizeY - 1 || !isVoxelSolid(x, y + 1, z)) {  // Top face
                         addFace(pos, Face::top);
@@ -397,7 +399,7 @@ void Chunk::placeTree(int x, int surfaceHeight, int z) {
 
 void Chunk::bindTextures() {
     for (size_t i = 0; i < faceTextures.size(); ++i) {
-        
+
         GLuint textureID = textureManager.loadTexture(faceTextures[i]);
         if (textureID == 0) {
             std::cerr << "Error: Failed to load texture " << faceTextures[i] << std::endl;
@@ -409,10 +411,10 @@ void Chunk::bindTextures() {
 
 void Chunk::highlightVoxel(const glm::ivec3& voxel) {
     // Ensure the voxel is within the chunk bounds
-    cout << "Highlighting voxel" << voxel.x << voxel.y << voxel.z << endl; 
+    cout << "Highlighting voxel" << voxel.x << voxel.y << voxel.z << endl;
     if (voxel.x >= 0 && voxel.x < sizeX && voxel.y >= 0 && voxel.y < sizeY && voxel.z >= 0 && voxel.z < sizeZ) {
         int faceStartIndex = voxel.x + voxel.y * sizeX + voxel.z * sizeX * sizeY;
-        
+
         // Set the color for the highlighted voxel (e.g., white)
         for (int i = 0; i < 6; i++) {
             colors[faceStartIndex * 18 + i * 3] = 1.0f;      // R
@@ -421,17 +423,17 @@ void Chunk::highlightVoxel(const glm::ivec3& voxel) {
         }
         cout << "done highlighting" << endl;
 
-        
+
     }
     generateChunk();
     setupMesh();
 
-} 
+}
 
 bool Chunk::isVoxelSolid(int x, int y, int z) {
     if (x >= 0 && x < sizeX && y >= 0 && y < sizeY && z >= 0 && z < sizeZ) {
         //print the voxel type
-        
+
         return voxels[x][y][z] != BlockType::Air;
     }
 
@@ -572,7 +574,7 @@ void Chunk::setupMesh() {
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);  // 2 components for texture coordinates
     glEnableVertexAttribArray(2);
 
-    
+
     // Bind element buffer (indices)
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
@@ -584,7 +586,7 @@ void Chunk::setupMesh() {
 
 void Chunk::randomlyRemoveVoxels(){
     int x = rand() % sizeX;
-    
+
     int z = rand() % sizeZ;
     // y height should be from surface, so we start from the top
     for (int y = sizeY - 1; y >= 0; --y) {
@@ -609,7 +611,7 @@ void Chunk::render(GLuint shaderProgram, const glm::mat4& view, const glm::mat4&
         std::cerr << "Error: Invalid or corrupted shader program: " << shaderProgram << std::endl;
         return;
     }
-    
+
     // Check if the program is linked
     GLint linkStatus;
     glGetProgramiv(shaderProgram, GL_LINK_STATUS, &linkStatus);
@@ -617,7 +619,7 @@ void Chunk::render(GLuint shaderProgram, const glm::mat4& view, const glm::mat4&
         std::cerr << "Error: Shader program is not properly linked" << std::endl;
         return;
     }
-    
+
     glUseProgram(shaderProgram);
     CHECK_GL_ERROR();
 
@@ -647,17 +649,17 @@ void Chunk::render(GLuint shaderProgram, const glm::mat4& view, const glm::mat4&
         std::cerr << "Error: Invalid or corrupted VAO: " << VAO << std::endl;
         return;
     }
-    
+
     if (VBO == 0 || !glIsBuffer(VBO)) {
         std::cerr << "Error: Invalid or corrupted VBO: " << VBO << std::endl;
         return;
     }
-    
+
     if (EBO == 0 || !glIsBuffer(EBO)) {
         std::cerr << "Error: Invalid or corrupted EBO: " << EBO << std::endl;
         return;
     }
-    
+
     glBindVertexArray(VAO);
     CHECK_GL_ERROR();
 
@@ -670,7 +672,7 @@ void Chunk::render(GLuint shaderProgram, const glm::mat4& view, const glm::mat4&
             glBindVertexArray(0);
             return;
         }
-        
+
         // Set texture parameters only once
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, cachedTextureID);
@@ -682,7 +684,7 @@ void Chunk::render(GLuint shaderProgram, const glm::mat4& view, const glm::mat4&
     }
 
     CHECK_GL_ERROR();
-    
+
     int textureUniformLoc = glGetUniformLocation(shaderProgram, "blockTexture");
     if (textureUniformLoc != -1) {
         glUniform1i(textureUniformLoc, 0);  // Set the atlas to the shader
