@@ -12,9 +12,6 @@ GLenum err;
         std::cerr << "OpenGL error: " << err << " at line " << __LINE__ << std::endl; \
     }
 
-
-
-
 Chunk::Chunk(int sizeX, int sizeY, int sizeZ, glm::vec3 position , Game *gameRef, GLuint shaderProgram, TextureManager& textureManager) :
     sizeX(sizeX), sizeY(sizeY), sizeZ(sizeZ), position(position), gameRef(gameRef), shaderProgram(shaderProgram), textureManager(textureManager) {
     // Load shaders
@@ -132,6 +129,7 @@ void Chunk::initChunk() {
 
             // Populate voxels in this column
             initializeVoxels(x, z, surfaceY);
+            carveCaves(x, z,0, surfaceY);
 
             // Place trees only on surface grass blocks
             if (shouldPlaceTree(worldX, worldZ, BiomeType::Plains)) {

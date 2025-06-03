@@ -4,6 +4,10 @@
 #include <OpenGL/gl.h>
 #include <GLFW/glfw3.h>
 #include <vector>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <optional>
 #include "Chunk.hpp"
 #include <utility>      // For std::pair
 #include <functional>   // For std::hash
@@ -32,6 +36,7 @@ public:
     Game(int width, int height);
     ~Game();
     GLuint shaderProgram;
+    GLuint outlineShaderProgram;
     ShaderLoader* shaderLoader;
     TextureManager* textureManager;
     GLuint textureID;
@@ -40,6 +45,8 @@ public:
     Chunk* getChunkAtWorldPosition(const glm::vec3& worldPos);
     Log logger;
     void Run();
+    void drawCrosshair();
+    void drawVoxelOutline(const glm::ivec3& voxelWorldPos, const glm::mat4& view, const glm::mat4& projection);
     std::unordered_map<std::pair<int, int>, Chunk*, pair_hash> loadedChunks;
 
     struct OpenGLState {
@@ -66,7 +73,7 @@ public:
     };
 
 
-void SaveOpenGLState(OpenGLState& state) {
+    void SaveOpenGLState(OpenGLState& state) {
     glGetIntegerv(GL_CURRENT_PROGRAM, &state.lastProgram);
     glGetIntegerv(GL_TEXTURE_BINDING_2D, &state.lastTexture);
     glGetIntegerv(GL_ACTIVE_TEXTURE, &state.lastActiveTexture);
@@ -80,7 +87,7 @@ void SaveOpenGLState(OpenGLState& state) {
     state.depthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
     state.cullFaceEnabled = glIsEnabled(GL_CULL_FACE);
     state.scissorTestEnabled = glIsEnabled(GL_SCISSOR_TEST);
-    
+
     glGetIntegerv(GL_BLEND_SRC_ALPHA, &state.blendSrcAlpha);
     glGetIntegerv(GL_BLEND_DST_ALPHA, &state.blendDstAlpha);
     glGetIntegerv(GL_BLEND_SRC_RGB, &state.blendSrcRgb);
@@ -91,7 +98,7 @@ void SaveOpenGLState(OpenGLState& state) {
     glGetIntegerv(GL_POLYGON_MODE, state.polygonMode);
 }
 
-void RestoreOpenGLState(const OpenGLState& state) {
+    void RestoreOpenGLState(const OpenGLState& state) {
     glUseProgram(state.lastProgram);
     glActiveTexture(state.lastActiveTexture);
     glBindTexture(GL_TEXTURE_2D, state.lastTexture);
@@ -105,7 +112,7 @@ void RestoreOpenGLState(const OpenGLState& state) {
     if (state.depthTestEnabled) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
     if (state.cullFaceEnabled) glEnable(GL_CULL_FACE); else glDisable(GL_CULL_FACE);
     if (state.scissorTestEnabled) glEnable(GL_SCISSOR_TEST); else glDisable(GL_SCISSOR_TEST);
-    
+
     glBlendFuncSeparate(state.blendSrcRgb, state.blendDstRgb, state.blendSrcAlpha, state.blendDstAlpha);
     glDepthFunc(state.depthFunc);
     glColorMask(state.colorMask[0], state.colorMask[1], state.colorMask[2], state.colorMask[3]);
@@ -118,8 +125,10 @@ void RestoreOpenGLState(const OpenGLState& state) {
 private:
     int width, height;
     GLFWwindow* window;
-    bool castRayForVoxel(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, glm::ivec3& hitVoxel, float maxDistance);
-
+    bool castRayForVoxel(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, glm::ivec3& hitVoxel, float maxDistance, bool forHighlight);
+    glm::mat4 view, projection;
+    glm::ivec3 lastHighlightVoxel;
+    bool hasHighlightedVoxel = false;
 
     void Init();
     void ProcessInput(float deltaTime);
@@ -128,12 +137,18 @@ private:
     void UpdateChunks();
     GLuint rayVAO, rayVBO;
 
+    GLuint cubeOutlineVAO, cubeOutlineVBO, cubeOutlineEBO;
+    GLuint outlineShader;
+    GLuint crosshairVAO, crosshairVBO, crosshairEBO;
+    GLuint crosshairShader;
 
     // Callbacks
     static void framebuffer_size_callback(GLFWwindow* window, int width, int height);
     static void mouse_button_callback(GLFWwindow* window, double xposIn, double yposIn);
     static void mouse_click_callback(GLFWwindow* window, int button, int action, int mods);
     static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
+    std::optional<glm::ivec3> selectedVoxel;
+
 };
 
 #endif

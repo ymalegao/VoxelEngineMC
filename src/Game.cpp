@@ -23,6 +23,11 @@ namespace std {
     };
 }
 
+
+#define PRINT_BLOCK_TYPE(bt) \
+    std::cout << "This voxel is a " << blockTypeToString(bt) << std::endl;
+
+
 #define CHUNK_SIZE 16
 #define CHUNK_HEIGHT 32
 
@@ -41,6 +46,31 @@ bool isInteractingWithImGui = false;
 std::deque<Chunk*> chunksToAdd;
 std::mutex chunkMutex;
 Log logger;
+
+float outlineVertices[] = {
+        -0.5f, -0.5f, -0.5f,  0.5f, -0.5f, -0.5f,  0.5f, 0.5f, -0.5f,  -0.5f, 0.5f, -0.5f,
+        -0.5f, -0.5f, 0.5f,  0.5f, -0.5f, 0.5f,  0.5f, 0.5f, 0.5f,  -0.5f, 0.5f, 0.5f
+    };
+
+    unsigned int outlineIndices[] = {
+        0,1, 1,2, 2,3, 3,0,
+        4,5, 5,6, 6,7, 7,4,
+        0,4, 1,5, 2,6, 3,7
+    };
+
+float crosshairVertices[] = {
+    // Horizontal line (in NDC coordinates)
+    -0.02f, 0.0f,
+     0.02f, 0.0f,
+    // Vertical line  
+     0.0f, -0.02f,
+     0.0f,  0.02f
+};
+
+unsigned int crosshairIndices[] = {
+    0, 1,  // Horizontal line
+    2, 3   // Vertical line
+};
 
 
 
@@ -67,6 +97,9 @@ void Game::mouse_button_callback(GLFWwindow* window, double xposIn, double yposI
     lastY = ypos;
 
     camera->processMouseMovement(xoffset, yoffset);
+    //highlight voxel?
+
+
 }
 
 void Game::mouse_click_callback(GLFWwindow* window, int button, int action, int mods) {
@@ -86,7 +119,7 @@ void Game::mouse_click_callback(GLFWwindow* window, int button, int action, int 
         cout << "Ray Origin: " << rayOrigin.x << " " << rayOrigin.y << " " << rayOrigin.z << endl;
         cout << "Ray Direction: " << rayDirection.x << " " << rayDirection.y << " " << rayDirection.z << endl;
 
-        if (game->castRayForVoxel(rayOrigin, rayDirection, hitVoxel, 50.0f)) {
+        if (game->castRayForVoxel(rayOrigin, rayDirection, hitVoxel, 50.0f, false)) {
         // If a voxel was hit, highlight or mark it (implement the logic to highlight)
             cout << "Voxel hit at " << hitVoxel.x << " " << hitVoxel.y << " " << hitVoxel.z << endl;
             //find the chunk that the ray is in
@@ -127,7 +160,7 @@ bool Game::raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, Ch
             currentVoxel.y - static_cast<int>(chunk.position.y),
             currentVoxel.z - static_cast<int>(chunk.position.z)
         );
-        
+
         // Debug the current ray position (world coordinates)
         std::cout << "Raycasting at world voxel: (" << currentVoxel.x << ", " << currentVoxel.y << ", " << currentVoxel.z << ")" << std::endl;
         std::cout << "Chunk-local voxel: (" << chunkLocalVoxel.x << ", " << chunkLocalVoxel.y << ", " << chunkLocalVoxel.z << ")" << std::endl;
@@ -143,12 +176,12 @@ bool Game::raycast(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, Ch
         // Check if the current voxel is solid using chunk-local coordinates
         if (chunk.isVoxelSolid(chunkLocalVoxel.x, chunkLocalVoxel.y, chunkLocalVoxel.z)) {
             hitVoxel = currentVoxel;  // Record the hit voxel (world coordinates)
-            
+
             // Remove the voxel using chunk-local coordinates
             chunk.voxels[chunkLocalVoxel.x][chunkLocalVoxel.y][chunkLocalVoxel.z] = BlockType::Air;
             chunk.generateChunk();  // Regenerate the chunk
             chunk.setupMesh();  // Setup the mesh
-            
+
             cout << "we hit a solid voxel" << endl;
             string coords = "(" + std::to_string(currentVoxel.x) + ", " + std::to_string(currentVoxel.y) + ", " + std::to_string(currentVoxel.z) + ")";
             string localCoords = "(" + std::to_string(chunkLocalVoxel.x) + ", " + std::to_string(chunkLocalVoxel.y) + ", " + std::to_string(chunkLocalVoxel.z) + ")";
@@ -263,6 +296,39 @@ void Game::Init() {
 
     glBindVertexArray(0);
 
+    glGenVertexArrays(1, &cubeOutlineVAO);
+    glGenBuffers(1, &cubeOutlineVBO);
+    glGenBuffers(1, &cubeOutlineEBO);
+
+    glBindVertexArray(cubeOutlineVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, cubeOutlineVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(outlineVertices), outlineVertices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeOutlineEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(outlineIndices), outlineIndices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glBindVertexArray(0); // clean
+
+
+    glGenVertexArrays(1, &crosshairVAO);
+    glGenBuffers(1, &crosshairVBO);
+    glGenBuffers(1, &crosshairEBO);
+
+    glBindVertexArray(crosshairVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, crosshairVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(crosshairVertices), crosshairVertices, GL_STATIC_DRAW);
+    
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, crosshairEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(crosshairIndices), crosshairIndices, GL_STATIC_DRAW);
+
+    // Specify vertex attribute pointer for position
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    
+    glBindVertexArray(0);
+
+
+
 
 
     logger.initialize(Log::INFO);
@@ -275,6 +341,8 @@ void Game::Init() {
     // chunk = new Chunk(16,16,16, glm::vec3(0.0f, 0.0f, 0.0f) , this); ;
     camera = new Camera();
     shaderProgram = shaderLoader->loadShaders("VertShader.vertexshader", "FragShader.fragmentshader");
+    outlineShader = shaderLoader->loadShaders("Outline.vert", "Outline.frag");
+    crosshairShader = shaderLoader->loadShaders("CrosshairShader.vert", "CrosshairShader.frag");
     this->textureManager = new TextureManager();
     this->textureID = textureManager->loadTexture("pics/spritesheet.png");
     cout << "Texture ID: " << textureID << endl;
@@ -317,7 +385,15 @@ void Game::ProcessInput(float deltaTime) {
 
 void Game::Update(float deltaTime) {
 
+    // glm::ivec3 hovered;
+    // if (castRayForVoxel(camera->cameraPos, camera->cameraFront, hovered, 10.0f, true)) {
+    //     selectedVoxel = hovered;
+    // } else {
+    //     selectedVoxel.reset();  // Clear highlight if no voxel hit
+    // }
+
     UpdateChunks();
+
 }
 std::unordered_set<std::pair<int, int>> chunksInQueue;
 
@@ -379,7 +455,7 @@ void Game::UpdateChunks() {
 Chunk* Game::getChunkAtWorldPosition(const glm::vec3& worldPos) {
     int chunkX = static_cast<int>(std::floor(worldPos.x / CHUNK_SIZE));
     int chunkZ = static_cast<int>(std::floor(worldPos.z / CHUNK_SIZE));
-    
+
     auto it = loadedChunks.find({chunkX, chunkZ});
     if (it != loadedChunks.end()) {
         return it->second;
@@ -387,7 +463,39 @@ Chunk* Game::getChunkAtWorldPosition(const glm::vec3& worldPos) {
     return nullptr;
 }
 
-bool Game::castRayForVoxel(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, glm::ivec3& hitVoxel, float maxDistance) {
+void Game::drawCrosshair() {
+    // Use orthographic projection for 2D screen-space rendering
+    glm::mat4 projection = glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f);
+
+    glUseProgram(crosshairShader);
+    glUniformMatrix4fv(glGetUniformLocation(crosshairShader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+    
+    // Disable depth testing so crosshair is always visible
+    glDisable(GL_DEPTH_TEST);
+    
+    glBindVertexArray(crosshairVAO);
+    glDrawElements(GL_LINES, 4, GL_UNSIGNED_INT, 0);  // Draw 2 lines (4 vertices)
+    glBindVertexArray(0);
+    
+    // Re-enable depth testing
+    glEnable(GL_DEPTH_TEST);
+}
+
+
+void Game::drawVoxelOutline(const glm::ivec3& voxelWorldPos, const glm::mat4& view, const glm::mat4& projection) {
+    std::cout << "Drawing voxel outline at " << voxelWorldPos.x << ", " << voxelWorldPos.y << ", " << voxelWorldPos.z << std::endl;
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(voxelWorldPos));
+    glm::mat4 mvp = projection * view * model;
+
+    glUseProgram(outlineShader);  // Use a dedicated wireframe shader
+    glUniformMatrix4fv(glGetUniformLocation(outlineShader, "mvp"), 1, GL_FALSE, glm::value_ptr(mvp));
+
+    glBindVertexArray(cubeOutlineVAO);  // A cube VAO that just draws edges
+    glDrawElements(GL_LINES, 24, GL_UNSIGNED_INT, 0);  // 12 edges = 24 indices
+}
+
+
+bool Game::castRayForVoxel(const glm::vec3& rayOrigin, const glm::vec3& rayDirection, glm::ivec3& hitVoxel, float maxDistance, bool forHighlight) {
     glm::vec3 rayPos = rayOrigin;
     glm::vec3 stepSize = glm::vec3(1.0f) / glm::abs(rayDirection);
     glm::ivec3 currentVoxel = glm::ivec3(std::floor(rayPos.x), std::floor(rayPos.y), std::floor(rayPos.z));
@@ -400,7 +508,7 @@ bool Game::castRayForVoxel(const glm::vec3& rayOrigin, const glm::vec3& rayDirec
         step.x > 0 ? 1.0f : 0.0f,
         step.y > 0 ? 1.0f : 0.0f,
         step.z > 0 ? 1.0f : 0.0f) - rayPos) / rayDirection;
-    
+
     float distance = 0.0f;
     Chunk* lastChunk = nullptr;
 
@@ -408,7 +516,7 @@ bool Game::castRayForVoxel(const glm::vec3& rayOrigin, const glm::vec3& rayDirec
         // Get the chunk at current world position
         glm::vec3 worldPos = glm::vec3(currentVoxel.x, currentVoxel.y, currentVoxel.z);
         Chunk* currentChunk = getChunkAtWorldPosition(worldPos);
-        
+
         if (currentChunk != nullptr) {
             // Log chunk change
             if (currentChunk != lastChunk) {
@@ -418,32 +526,45 @@ bool Game::castRayForVoxel(const glm::vec3& rayOrigin, const glm::vec3& rayDirec
                 logger.log("INFO", "Ray entered " + chunkName);
                 lastChunk = currentChunk;
             }
-            
+
             // Convert world coordinates to chunk-local coordinates
             glm::ivec3 chunkLocalVoxel = glm::ivec3(
                 currentVoxel.x - static_cast<int>(currentChunk->position.x),
                 currentVoxel.y - static_cast<int>(currentChunk->position.y),
                 currentVoxel.z - static_cast<int>(currentChunk->position.z)
             );
-            
+
             // Check bounds within chunk
             if (chunkLocalVoxel.x >= 0 && chunkLocalVoxel.x < currentChunk->sizeX &&
                 chunkLocalVoxel.y >= 0 && chunkLocalVoxel.y < currentChunk->sizeY &&
                 chunkLocalVoxel.z >= 0 && chunkLocalVoxel.z < currentChunk->sizeZ) {
-                
+
                 // Check if the current voxel is solid
                 if (currentChunk->isVoxelSolid(chunkLocalVoxel.x, chunkLocalVoxel.y, chunkLocalVoxel.z)) {
                     hitVoxel = currentVoxel;  // Record the hit voxel (world coordinates)
-                    
+
+                    PRINT_BLOCK_TYPE(currentChunk->voxels[chunkLocalVoxel.x][chunkLocalVoxel.y][chunkLocalVoxel.z])
                     // Remove the voxel using chunk-local coordinates
-                    currentChunk->voxels[chunkLocalVoxel.x][chunkLocalVoxel.y][chunkLocalVoxel.z] = BlockType::Air;
-                    currentChunk->generateChunk();
-                    currentChunk->setupMesh();
+                    if (!forHighlight){
+                       
                     
-                    string coords = "(" + std::to_string(currentVoxel.x) + ", " + std::to_string(currentVoxel.y) + ", " + std::to_string(currentVoxel.z) + ")";
-                    string localCoords = "(" + std::to_string(chunkLocalVoxel.x) + ", " + std::to_string(chunkLocalVoxel.y) + ", " + std::to_string(chunkLocalVoxel.z) + ")";
-                    logger.log("INFO", "Hit solid voxel at world " + coords + " chunk-local " + localCoords);
-                    return true;
+                        currentChunk->voxels[chunkLocalVoxel.x][chunkLocalVoxel.y][chunkLocalVoxel.z] = BlockType::Air;
+                        currentChunk->generateChunk();
+                        currentChunk->setupMesh();
+
+                        string coords = "(" + std::to_string(currentVoxel.x) + ", " + std::to_string(currentVoxel.y) + ", " + std::to_string(currentVoxel.z) + ")";
+                        string localCoords = "(" + std::to_string(chunkLocalVoxel.x) + ", " + std::to_string(chunkLocalVoxel.y) + ", " + std::to_string(chunkLocalVoxel.z) + ")";
+                        logger.log("INFO", "Hit solid voxel at world " + coords + " chunk-local " + localCoords);
+
+                        return true;
+                    }
+
+                    else{
+                        string coords = "(" + std::to_string(currentVoxel.x) + ", " + std::to_string(currentVoxel.y) + ", " + std::to_string(currentVoxel.z) + ")";
+                        string localCoords = "(" + std::to_string(chunkLocalVoxel.x) + ", " + std::to_string(chunkLocalVoxel.y) + ", " + std::to_string(chunkLocalVoxel.z) + ")";
+                        logger.log("INFO", "Hit solid voxel at world " + coords + " chunk-local " + localCoords);
+                        return true;
+                    }
                 }
             }
         }
@@ -476,13 +597,21 @@ bool Game::castRayForVoxel(const glm::vec3& rayOrigin, const glm::vec3& rayDirec
             break;
         }
     }
-    
+
     logger.log("INFO", "Ray hit nothing");
     return false;
 }
 void Game::Render() {
     // Enable wireframe mode for debugging (if needed)
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    glm::ivec3 hoveredVoxel;
+    bool hasHit = castRayForVoxel(camera->cameraPos, camera->cameraFront, hoveredVoxel, 50, /*highlight*/ true);
+    std::optional<glm::ivec3> selectedVoxel;
+    
+    // Set selectedVoxel based on raycast result
+    if (hasHit) {
+        selectedVoxel = hoveredVoxel;
+    }
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     // Set the sky color to light sky blue
@@ -545,6 +674,10 @@ void Game::Render() {
         }
     }
 
+    if (selectedVoxel.has_value()) {
+        drawVoxelOutline(selectedVoxel.value(), view, projection);
+    }
+
     // Save OpenGL state before ImGui
     OpenGLState state;
     SaveOpenGLState(state);
@@ -559,6 +692,7 @@ void Game::Render() {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+    drawCrosshair();
 
     ImGui::Begin("Log");
     logger.displayLog();

@@ -18,6 +18,24 @@ enum Face {
 
 enum class BlockType { Air, Grass, Wood, GrassSide, Stone, Dirt, Sand, WoodSide, GrassTop, WoodTop , Sandstone, Leaves};
 
+inline std::string blockTypeToString(BlockType type) {
+    switch (type) {
+        case BlockType::Air:        return "Air";
+        case BlockType::Grass:      return "Grass";
+        case BlockType::GrassSide:  return "GrassSide";
+        case BlockType::GrassTop:   return "GrassTop";
+        case BlockType::Stone:      return "Stone";
+        case BlockType::Dirt:       return "Dirt";
+        case BlockType::Sand:       return "Sand";
+        case BlockType::Wood:       return "Wood";
+        case BlockType::WoodSide:   return "WoodSide";
+        case BlockType::WoodTop:    return "WoodTop";
+        case BlockType::Sandstone:  return "Sandstone";
+        case BlockType::Leaves:     return "Leaves";
+        default:                    return "Unknown";
+    }
+}
+
 static std::unordered_map<BlockType, glm::vec2> blockTypeToTextureCoords = {
     {BlockType::GrassSide, {3,0}},
     {BlockType::GrassTop, {0, 0}},
